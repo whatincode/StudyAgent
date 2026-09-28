@@ -1,0 +1,1809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StudyPilot Agent — an autonomous study agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* -- study-arcade palette: candy accents on a bright, clean canvas -- */
+  --bg:#F5F3FF; --panel:#FFFFFF; --panel2:#F6F2FF; --raised:#EFE7FF;
+  --ink:#211A3D; --mut:#655F80; --faint:#9891B3; --line:#E7E0F7;
+  --amber:#7C3AED; --amber-dim:#7C3AED1F; --amber-vivid:#8B5CF6;
+  --teal:#0E9F6E; --teal-dim:#0E9F6E26;
+  --coral:#EF3D6D; --coral-dim:#EF3D6D26; --coral-vivid:#FF6B99;
+  --gold:#C97A0B; --gold-dim:#F5A62333; --gold-vivid:#FFC24B;
+  --lavender:#2E6BF0; --lavender-vivid:#5B8DFF;
+  --rail-a:#241454; --rail-b:#4C1D95; --rail-ink:#E7DEFF;
+  --grad-hero:linear-gradient(135deg,#7C3AED,#EF3D6D);
+  --grad-gold:linear-gradient(135deg,#F5A623,#FFC24B);
+  --shadow-card:0 2px 6px #7c3aed0d,0 10px 26px #7c3aed12;
+  --shadow-glow:0 8px 22px #7c3aed3d;
+  --font-head:'Fredoka',ui-rounded,system-ui,sans-serif;
+  --font-body:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font:15px/1.6 var(--font-body);-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(900px 500px at -8% -12%, #7C3AED14, transparent 60%),
+    radial-gradient(700px 420px at 108% 0%, #EF3D6D12, transparent 55%),
+    radial-gradient(600px 380px at 50% 115%, #0E9F6E10, transparent 60%),
+    var(--bg);
+  background-attachment:fixed}
+h1,h2,h3,h4{font-family:var(--font-head);margin:0;letter-spacing:.001em;font-weight:600}
+button.btn,.tag,.item span{font-family:var(--font-body)}
+a{color:inherit}
+button,select,input,textarea{font:inherit;color:inherit}
+::selection{background:var(--coral-dim)}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ---------- layout shell ---------- */
+.shell{display:flex;flex-direction:column;min-height:100%}
+.appheader{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top,0px));
+  background:linear-gradient(100deg,var(--rail-a),var(--rail-b));box-shadow:0 2px 22px #24145430;position:relative;z-index:2}
+.appheader .brand{display:flex;align-items:center;gap:10px;flex:none}
+.appheader .mark{width:34px;height:34px;border-radius:10px;background:var(--grad-hero);
+  display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 3px 12px #ef3d6d55}
+.appheader .mark svg{width:19px;height:19px}
+.appheader .wordmark{font-family:var(--font-head);font-weight:700;font-size:16.5px;color:#fff;letter-spacing:.01em;white-space:nowrap}
+.headerright{display:flex;align-items:center;gap:16px;flex:none}
+.gamify-h{display:flex;align-items:center;gap:8px}
+.gamify-h .lvl{width:28px;height:28px;border-radius:50%;background:var(--grad-gold);display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-head);font-weight:700;color:#4A2E00;font-size:11px;box-shadow:0 3px 10px #f5a62355;flex:none}
+.gamify-h .streak{font-size:12px;color:#FFD98E;font-weight:600;white-space:nowrap}
+.pulse-h{display:flex;align-items:center;gap:6px}
+.pulse-h i{width:7px;height:7px;border-radius:50%;flex:none;animation:blink 2.4s ease-in-out infinite}
+.pulse-h small{font-size:9.5px;color:#B9AEEA;letter-spacing:.05em;white-space:nowrap}
+.tabbar{display:flex;align-items:center;gap:3px;overflow-x:auto;padding:9px 14px;background:var(--rail-b);
+  scrollbar-width:none;box-shadow:0 8px 18px #24145420;position:relative;z-index:1}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar .item{flex:none;display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;cursor:pointer;
+  color:#C9BEF0;font-size:12.5px;font-weight:600;white-space:nowrap;transition:color .15s,background .15s,transform .1s;border:1px solid transparent}
+.tabbar .item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;flex:none}
+.tabbar .item:hover{color:#fff;background:#ffffff14;transform:translateY(-1px)}
+.tabbar .item.on{color:#fff;background:var(--grad-hero);box-shadow:0 3px 10px #7c3aed55}
+.tabbar .tab-divider{flex:none;width:1px;height:22px;background:#ffffff26;margin:0 5px}
+.gamify{display:none} /* legacy vertical-rail gamify widget, superseded by .gamify-h in the header */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes badgePop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+main{flex:1;min-width:0;padding:22px 26px 60px;max-width:1180px;width:100%;margin:0 auto;box-sizing:border-box}
+.pagehead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.pagehead h1{font-size:25px;font-weight:600}
+.pagehead .sub{color:var(--mut);font-size:13px;margin-top:4px}
+.student-switch{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px;box-shadow:0 1px 2px #2b274008}
+.student-switch button{background:transparent;border:0;padding:6px 11px;border-radius:7px;color:var(--mut);cursor:pointer;font-size:12.5px}
+.student-switch button.on{background:var(--raised);color:var(--amber)}
+
+/* ---------- generic pieces ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow-card)}
+.panel h3{font-size:13.5px;font-weight:600;color:var(--mut);text-transform:none;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-family:var(--font-head)}
+.full{grid-column:1/-1}
+.mu{color:var(--mut)}
+.faint{color:var(--faint)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 15px;box-shadow:var(--shadow-card)}
+.kpi small{color:var(--mut);font-size:11.5px}
+.kpi b{display:block;font-family:var(--font-head);font-size:27px;margin-top:3px;font-weight:600;background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.bar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.row{display:grid;grid-template-columns:1fr 110px 38px;gap:10px;align-items:center;margin:9px 0}
+.row .lbl{font-size:13px}
+.tag{padding:2px 9px;border-radius:20px;font-size:11px;border:1px solid currentColor;white-space:nowrap;font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600;font-size:11.5px;letter-spacing:.02em}
+.scx{overflow-x:auto}
+button.btn{background:var(--raised);border:1px solid var(--line);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;transition:border-color .15s,filter .15s,transform .1s}
+button.btn:hover{border-color:var(--faint)}
+button.btn:active{transform:scale(.96)}
+button.btn.p{background:var(--grad-hero);border-color:transparent;color:#fff;font-weight:600;box-shadow:var(--shadow-glow)}
+button.btn.p:hover{filter:brightness(1.08)}
+button.btn:disabled{opacity:.45;cursor:default;transform:none}
+button:focus-visible,.item:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.badge-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 12px 6px 8px;font-size:12.5px;font-weight:600;color:var(--ink);animation:badgePop .4s ease both}
+.badge-chip .ic{width:22px;height:22px;border-radius:50%;background:var(--grad-gold);display:flex;align-items:center;justify-content:center;font-size:12px}
+#confetti-layer{position:fixed;inset:0;pointer-events:none;z-index:9999}
+.create-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.create-tab{background:var(--panel);border:1.5px solid var(--line);padding:9px 15px;border-radius:11px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mut);transition:border-color .15s,color .15s,transform .1s}
+.create-tab:hover{border-color:var(--faint);transform:translateY(-1px)}
+.create-tab.on{background:var(--grad-hero);border-color:transparent;color:#fff;box-shadow:var(--shadow-glow)}
+
+/* ---------- agent console (hero) ---------- */
+.console{border:1px solid #7c3aed22;border-radius:20px;overflow:hidden;margin-bottom:18px;box-shadow:0 14px 34px #7c3aed22;background:
+  radial-gradient(1100px 260px at 15% -20%, #7C3AED1c, transparent 60%),
+  radial-gradient(800px 220px at 100% 0%, #EF3D6D16, transparent 55%), var(--panel)}
+.console-top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px}
+.console-top .who{display:flex;align-items:center;gap:10px}
+.console-top .who i{width:9px;height:9px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px var(--teal-dim)}
+.console-top h2{font-size:17px;font-family:var(--font-head)}
+.console-body{display:block}
+.decision{padding:18px;border-right:1px solid var(--line)}
+@media(max-width:860px){.decision{border-right:0;border-bottom:1px solid var(--line)}}
+.decision .step{font-size:11px;letter-spacing:.06em;color:var(--amber);font-weight:700}
+.decision h3{font-family:var(--font-head);font-size:22px;font-weight:600;margin-bottom:6px}
+.decision p{color:var(--mut);font-size:13.5px;margin:0 0 12px}
+.factors{display:flex;flex-direction:column;gap:7px;margin:12px 0}
+.factor{display:grid;grid-template-columns:120px 1fr 40px;gap:9px;align-items:center;font-size:12px}
+.conf{display:inline-flex;align-items:baseline;gap:5px;font-family:var(--font-head);font-size:30px;font-weight:700;
+  background:var(--grad-hero);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.conf small{font-family:var(--font-body);font-size:11px;color:var(--mut);-webkit-text-fill-color:var(--mut)}
+.log{background:var(--panel2);padding:16px 18px;max-height:340px;overflow-y:auto;font-family:var(--font-mono);font-size:12px;line-height:1.7;border-top:1px solid var(--line)}
+.log .ln{white-space:pre-wrap;word-break:break-word}
+.log .t{color:var(--faint)}
+.log .PERCEIVE{color:var(--lavender)}
+.log .ANALYZE{color:var(--gold)}
+.log .DECIDE{color:var(--amber)}
+.log .ACT{color:var(--teal)}
+.log .step-lbl{font-weight:600;letter-spacing:.02em}
+
+/* ---------- chart bits (svg) ---------- */
+svg text{font-family:var(--font-body)}
+
+/* ---------- quiz ---------- */
+.qopt{display:flex;gap:10px;align-items:flex-start;padding:10px 13px;margin:7px 0;border:1.5px solid var(--line);border-radius:12px;cursor:pointer;background:var(--panel2);transition:border-color .12s,transform .1s}
+.qopt:hover{border-color:var(--faint);transform:translateX(2px)}
+.qopt.sel{border-color:var(--amber);background:var(--amber-dim);box-shadow:0 2px 8px #7c3aed26}
+.qopt input{margin-top:3px}
+.msg{padding:10px 13px;border-radius:14px;margin:7px 0;max-width:88%;font-size:13.5px}
+.msg.user{background:var(--grad-hero);color:#fff;margin-left:auto}
+.msg.ai{border:1px solid var(--line);background:var(--panel2)}
+
+/* mobile */
+@media(max-width:760px){
+  .appheader{padding:10px 14px}
+  .appheader .wordmark{font-size:15px}
+  .headerright{gap:10px}
+  .pulse-h small{display:none}
+  main{padding:16px 14px 50px}
+  .row{grid-template-columns:1fr 84px 34px}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
+<script>
+try{ if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+</script>
+<script>
+/* =====================================================================
+   StudyPilot Agent — dual-mode build.
+   DEMO MODE (default): everything runs client-side against seeded data,
+   so it never depends on network access, API keys, or a deployed backend.
+   LIVE MODE (optional, via the "Connect" page): the exact same UI talks to
+   a real Supabase project and its Edge Functions (agent-cycle, get-quiz,
+   submit-quiz-attempt, get-assessment-analytics, ai-tutor) — see /backend
+   and /database in the project download. Both modes render through the
+   same page functions; only where the data comes from differs.
+===================================================================== */
+
+/* ---------------- seed data: four demo students ---------------- */
+const QUIZ_BANK = {
+  Loops: [
+    {q:"What will this print?\n\nfor i in range(3):\n    print(i)", opts:["0 1 2","1 2 3","0 1 2 3","3"], a:"0 1 2", diff:"easy", explain:"range(3) yields 0, 1, 2 — three values starting at 0, not including 3."},
+    {q:"Which loop is guaranteed to run its body at least once?", opts:["for","while","do-while","none of these"], a:"do-while", diff:"med", explain:"A do-while checks its condition after the body runs; for/while check first and can skip the body entirely."},
+    {q:"What does `break` do inside a loop?", opts:["Skips to the next iteration","Exits the loop immediately","Restarts the loop","Pauses the program"], a:"Exits the loop immediately", diff:"easy", explain:"`break` stops the nearest enclosing loop right away, skipping any remaining iterations."},
+    {q:"How many times does `for i in range(5):` run?", opts:["4","5","6","Infinite"], a:"5", diff:"easy", explain:"range(5) produces 5 values: 0,1,2,3,4."},
+    {q:"What is an infinite loop usually caused by?", opts:["A missing return statement","A condition that never becomes false","Too many variables","Using range()"], a:"A condition that never becomes false", diff:"med", explain:"If the loop's exit condition never evaluates to false, the loop keeps running forever."},
+    {q:"What will this print?\n\nfor i in range(2):\n    for j in range(2):\n        print(i, j)", opts:["0 0\n0 1\n1 0\n1 1","0 0\n1 1","(0,0) once","It errors"], a:"0 0\n0 1\n1 0\n1 1", diff:"hard", explain:"The inner loop runs completely for every single iteration of the outer loop — 2×2 = 4 print statements."},
+    {q:"Which keyword skips the rest of the current iteration and continues the loop?", opts:["break","continue","pass","return"], a:"continue", diff:"med", explain:"`continue` jumps straight to the next iteration, skipping whatever code comes after it in the current pass."},
+    {q:"Two loops are nested, each running n times. What's the time complexity?", opts:["O(n)","O(log n)","O(n^2)","O(2n)"], a:"O(n^2)", diff:"hard", explain:"The inner loop runs n times for each of the outer loop's n iterations — n × n = n² total operations."},
+  ],
+  Functions: [
+    {q:"What keyword defines a function in Python?", opts:["func","def","function","lambda"], a:"def", diff:"easy", explain:"Python functions are defined with the `def` keyword, followed by a name and parentheses."},
+    {q:"What does a function return if it has no `return` statement?", opts:["0","an error","None","an empty string"], a:"None", diff:"easy", explain:"Python functions implicitly return `None` if execution reaches the end without an explicit return."},
+    {q:"What is a parameter with a default value called?", opts:["Positional argument","Default parameter","Global variable","Return type"], a:"Default parameter", diff:"med", explain:"A default parameter supplies a fallback value used when the caller doesn't pass one in."},
+    {q:"Why use functions instead of repeating code?", opts:["They run faster always","Reusability and clarity","They use less memory always","Python requires it"], a:"Reusability and clarity", diff:"easy", explain:"Functions let you name and reuse a block of logic instead of copy-pasting it, making code easier to read and maintain."},
+    {q:"What is it called when a function calls itself?", opts:["Iteration","Recursion","Looping","Nesting"], a:"Recursion", diff:"med", explain:"A function that calls itself (directly or indirectly) is a recursive function."},
+    {q:"For `def f(a, b=2, *args): pass`, calling `f(1,2,3,4)` means:", opts:["It's a syntax error","args becomes (3, 4)","b is set to 3 only","a TypeError is raised"], a:"args becomes (3, 4)", diff:"hard", explain:"After filling the named parameters a=1, b=2, the remaining positional arguments (3, 4) collect into the *args tuple."},
+  ],
+};
+const STUDENTS = {
+  aarav:{
+    name:"Aarav Mehta", age:"15-18", level:"Grade 10",
+    topics:{
+      Loops:{correct:4,total:10,trend:"declining",mistakes:[{type:"CONCEPTUAL",n:2},{type:"CARELESS",n:1}]},
+      Functions:{correct:7,total:10,trend:"stable",mistakes:[{type:"CALCULATION",n:1}]},
+      "Linear Equations":{correct:8,total:12,trend:"improving",mistakes:[{type:"CARELESS",n:1}]},
+      Recursion:{correct:2,total:6,trend:"insufficient_data",mistakes:[{type:"CONCEPTUAL",n:2}]},
+    },
+    history:[
+      {topic:"Loops",score:4,total:10,daysAgo:1},
+      {topic:"Functions",score:7,total:10,daysAgo:3},
+      {topic:"Linear Equations",score:8,total:12,daysAgo:6},
+      {topic:"Loops",score:5,total:10,daysAgo:9},
+    ],
+  },
+  diya:{
+    name:"Diya Kapoor", age:"11-14", level:"Grade 8",
+    topics:{
+      Loops:{correct:8,total:10,trend:"stable",mistakes:[{type:"CARELESS",n:1}]},
+      Functions:{correct:9,total:10,trend:"improving",mistakes:[]},
+      "Linear Equations":{correct:3,total:10,trend:"declining",mistakes:[{type:"CONCEPTUAL",n:4},{type:"CALCULATION",n:2}]},
+      Recursion:{correct:6,total:8,trend:"stable",mistakes:[{type:"CALCULATION",n:1}]},
+    },
+    history:[
+      {topic:"Linear Equations",score:3,total:10,daysAgo:1},
+      {topic:"Loops",score:8,total:10,daysAgo:2},
+      {topic:"Linear Equations",score:4,total:10,daysAgo:8},
+    ],
+  },
+  rohan:{
+    name:"Rohan Iyer", age:"15-18", level:"Grade 11",
+    topics:{
+      Loops:{correct:9,total:10,trend:"stable",mistakes:[]},
+      Functions:{correct:10,total:10,trend:"stable",mistakes:[]},
+      "Linear Equations":{correct:11,total:12,trend:"stable",mistakes:[{type:"CARELESS",n:1}]},
+      Recursion:{correct:7,total:8,trend:"improving",mistakes:[]},
+    },
+    history:[
+      {topic:"Recursion",score:7,total:8,daysAgo:2},
+      {topic:"Functions",score:10,total:10,daysAgo:5},
+      {topic:"Loops",score:9,total:10,daysAgo:7},
+    ],
+  },
+  sneha:{
+    name:"Sneha Rao", age:"6-10", level:"Grade 5",
+    topics:{
+      Loops:{correct:7,total:10,trend:"improving",mistakes:[{type:"CONCEPTUAL",n:1}]},
+      Functions:{correct:6,total:8,trend:"stable",mistakes:[{type:"CARELESS",n:1}]},
+      "Linear Equations":{correct:7,total:10,trend:"stable",mistakes:[{type:"CALCULATION",n:2}]},
+      Recursion:{correct:0,total:0,trend:"insufficient_data",mistakes:[]},
+    },
+    history:[
+      {topic:"Functions",score:6,total:8,daysAgo:1},
+      {topic:"Loops",score:7,total:10,daysAgo:4},
+    ],
+  },
+};
+
+/* ---------------- flashcards: SM-2 spaced repetition ---------------- */
+const todayISO = () => new Date().toISOString().slice(0,10);
+function addDaysISO(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+let FC_ID = 1;
+function newCard(topic,q,a,source,over={}){ return Object.assign({id:'fc'+(FC_ID++), topic, q, a, ease:2.5, interval:0, reps:0, due:todayISO(), source}, over); }
+function sm2Review(card, quality){
+  // quality: 0=Again, 3=Hard, 4=Good, 5=Easy (simplified SM-2)
+  if(quality<3){ card.reps=0; card.interval=1; }
+  else {
+    card.ease = Math.max(1.3, +(card.ease + (0.1-(5-quality)*(0.08+(5-quality)*0.02))).toFixed(2));
+    card.reps += 1;
+    card.interval = card.reps===1 ? 1 : card.reps===2 ? 6 : Math.round(card.interval*card.ease);
+  }
+  card.due = addDaysISO(card.interval);
+}
+function registerWrongAnswer(student, topic, question, correctAnswer){
+  const key = topic+'||'+question;
+  student.wrongCounts[key] = (student.wrongCounts[key]||0)+1;
+  if(student.wrongCounts[key]===2 && !student.flashcards.some(c=>c.topic===topic && c.q===question)){
+    student.flashcards.unshift(newCard(topic, question, correctAnswer, 'auto_from_mistake'));
+  }
+}
+// seed a couple of cards per demo student so the feature has real content on first load
+Object.entries(STUDENTS).forEach(([id,s])=>{ s.wrongCounts={}; s.flashcards=[]; s.recHistory=[]; initGamify(id, s); });
+STUDENTS.aarav.flashcards.push(newCard('Loops','Which loop is guaranteed to run its body at least once?','do-while','auto_from_mistake'));
+STUDENTS.diya.flashcards.push(newCard('Linear Equations','What does the slope of a line represent?','The rate of change of y with respect to x','auto_from_mistake'));
+STUDENTS.rohan.flashcards.push(newCard('Recursion','What must every recursive function have to avoid infinite recursion?','A base case','manual',{ease:2.6,interval:3,reps:1,due:addDaysISO(3)}));
+STUDENTS.sneha.flashcards.push(newCard('Functions','What does a function return if it has no return statement?','None','auto_from_mistake'));
+
+/* ---------------- the agent: perceive -> analyze -> decide -> act ----------------
+   This is the actual AI-agent model the assignment asks for: a bounded, explainable
+   loop that (1) reads fresh evidence about the student, (2) scores each topic against
+   thresholds, (3) picks and justifies ONE next action with a confidence score, and
+   (4) commits a concrete artifact (a recommendation + a micro-plan). It is re-run
+   every time new evidence arrives (on quiz submit), the way an autonomous agent
+   should be — not just a chatbot answering one prompt at a time. */
+const GAP_T = 0.55, PRACTICE_T = 0.75;
+function statusFor(acc){ if(acc<GAP_T) return "knowledge_gap"; if(acc<PRACTICE_T) return "needs_practice"; return "strong"; }
+const STAT_LABEL = {knowledge_gap:["Needs work","var(--coral)"], needs_practice:["Needs practice","var(--gold)"], strong:["Strong","var(--teal)"], insufficient_data:["Not enough data","var(--faint)"]};
+const TREND_LABEL = {improving:["Improving","var(--teal)"],declining:["Declining","var(--coral)"],stable:["Stable","var(--gold)"],insufficient_data:["No trend yet","var(--faint)"]};
+const MISTAKE_COLOR = {CONCEPTUAL:"var(--coral)",CALCULATION:"var(--gold)",CARELESS:"var(--lavender)",insufficient:"var(--faint)"};
+const MISTAKE_LABEL = {CONCEPTUAL:"Misunderstood the concept",CALCULATION:"Calculation error",CARELESS:"Careless slip",insufficient:"Not enough data"};
+function mistakeLabel(t){ return MISTAKE_LABEL[t] || t; }
+// Plain-language labels for factor keys that come straight from the backend (e.g. "accuracy_gap").
+// Demo mode already uses friendly names ("accuracy", "trend", ...); this covers the live-backend names too.
+const FACTOR_LABEL = {
+  accuracy_gap: "How far below target",
+  recent_mistakes: "Recent mistakes",
+  accuracy_trend: "Recent trend",
+  accuracy: "Accuracy",
+  trend: "Trend",
+  "recorded mistakes": "Recorded mistakes",
+};
+function factorLabel(f){ return FACTOR_LABEL[f] || f; }
+
+function analyze(student){
+  const topics = Object.entries(student.topics).map(([topic,t])=>{
+    const acc = t.total? t.correct/t.total : null;
+    const status = acc==null ? "insufficient_data" : statusFor(acc);
+    const mistakeCount = t.mistakes.reduce((s,m)=>s+m.n,0);
+    return {topic, acc, accPct: acc==null?null:Math.round(acc*100), status, trend:t.trend, correct:t.correct, incorrect:t.total-t.correct, total:t.total, mistakeCount, mistakes:t.mistakes};
+  });
+  return topics;
+}
+
+/* Score every topic with weighted factors (used both to pick the agent's top
+   pick, and to plot every topic's own confidence for the scatter chart). */
+function scoreTopics(topics){
+  return topics.filter(t=>t.total>0).map(t=>{
+    const gapW = t.status==="knowledge_gap"?1:t.status==="needs_practice"?.55:.1;
+    const trendW = t.trend==="declining"?1:t.trend==="stable"?.4:t.trend==="improving"?.15:.3;
+    const mistakeW = Math.min(1, t.mistakeCount/4);
+    const score = gapW*0.5 + trendW*0.3 + mistakeW*0.2;
+    const confidence = Math.round(Math.min(96, 58 + score*40));
+    return {...t, score, confidence,
+      factors:[
+        {factor:"accuracy", value:t.accPct+"%", weight:gapW},
+        {factor:"trend", value:(TREND_LABEL[t.trend]||[t.trend])[0], weight:trendW},
+        {factor:"recorded mistakes", value:t.mistakeCount, weight:mistakeW},
+      ]};
+  }).sort((a,b)=>b.score-a.score);
+}
+/* Decide: pick the highest-priority topic from the scored list. */
+function decide(topics){ return scoreTopics(topics)[0] || null; }
+
+function act(pick){
+  if(!pick) return null;
+  const priority = pick.score>0.6?"high":pick.score>0.35?"medium":"low";
+  const confidence = Math.round(Math.min(96, 58 + pick.score*40));
+  const reasonBits = [];
+  if(pick.status==="knowledge_gap") reasonBits.push(`your accuracy on ${pick.topic} is ${pick.accPct}%, well below where it needs to be`);
+  else if(pick.status==="needs_practice") reasonBits.push(`your accuracy on ${pick.topic} is ${pick.accPct}%, close but not quite solid yet`);
+  if(pick.trend==="declining") reasonBits.push("your recent attempts are trending down");
+  if(pick.mistakeCount>0) reasonBits.push(`${pick.mistakeCount} mistake${pick.mistakeCount===1?"":"s"} logged here recently`);
+  const reason = reasonBits.length? "Recommended because "+reasonBits.join("; ")+"." : `${pick.topic} is the topic you've practised least so far.`;
+  return {
+    topic:pick.topic, priority, confidence, reason, factors:pick.factors,
+    plan:[`3-question warm-up quiz on ${pick.topic}`, `Socratic tutor session (age-adapted) on the weakest sub-skill`, `Re-check accuracy after the next attempt`],
+  };
+}
+
+function runAgentCycle(student, trigger){
+  const topics = analyze(student);
+  closeTrustLoopDemo(student, topics);
+  const pick = decide(topics);
+  const action = act(pick);
+  if(action) recordRecommendationDemo(student, action, topics);
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const entries = [];
+  entries.push({t:time, step:"PERCEIVE", text: trigger==="init" ? `loaded ${topics.filter(t=>t.total>0).length} topic${topics.filter(t=>t.total>0).length===1?"":"s"} of evidence for ${student.name}` : trigger});
+  entries.push({t:time, step:"ANALYZE", text: topics.filter(t=>t.total>0).map(t=>`${t.topic} → ${t.accPct}% (${(STAT_LABEL[t.status]||[t.status])[0].toLowerCase()}, ${(TREND_LABEL[t.trend]||[t.trend])[0].toLowerCase()})`).join("  ·  ")});
+  if(action){
+    entries.push({t:time, step:"DECIDE", text:`selected "${action.topic}" — priority ${action.priority}, confidence ${action.confidence}% (score beat ${topics.filter(x=>x.total>0).length-1} other candidate${topics.filter(x=>x.total>0).length-1===1?"":"s"})`});
+    entries.push({t:time, step:"ACT", text:`wrote recommendation for "${action.topic}" and queued a ${action.plan.length}-step micro-plan`});
+  }
+  return {topics, action, entries};
+}
+
+/* ---------------- socratic tutor (deterministic stand-in for the LLM edge function) ---------------- */
+const AGE_VOICE = {
+  "6-10":"very short sentences and a friendly, playful example",
+  "11-14":"simple words and a concrete everyday example",
+  "15-18":"clear language with an exam-style example",
+  "adult":"concise, technically precise language",
+};
+function mdToHtml(text){
+  let s = esc(String(text||''));
+  s = s.replace(/```([\s\S]*?)```/g, (_,c)=>`<pre style="white-space:pre-wrap;background:var(--panel2);border-radius:8px;padding:8px 10px;margin:6px 0;font-family:var(--font-mono);font-size:12px">${c}</pre>`);
+  s = s.replace(/`([^`\n]+)`/g, '<code style="background:var(--panel2);border-radius:4px;padding:1px 5px;font-family:var(--font-mono);font-size:.92em">$1</code>');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>');
+  s = s.replace(/^-\s+(.+)$/gm, '<li>$1</li>').replace(/(<li>.*<\/li>)/s, '<ul style="margin:6px 0;padding-left:20px">$1</ul>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+function tutorReply(student, topic, mode, turn){
+  const voice = AGE_VOICE[student.age] || AGE_VOICE.adult;
+  const bank = {
+    Loops:{
+      hint:["Before I tell you — what does the loop variable `i` hold on the very first pass?","Good. Now, does `range(3)` include the number 3 itself? Try counting it out on paper.","You're close. What statement would you use to stop the loop early, before it finishes naturally?"],
+      explain:[`A **loop** is just a way to tell the computer "do this again and again" instead of writing the same line of code many times.\n\nIn Python, \`for i in range(3):\` runs the code inside it **3 times** — once with \`i = 0\`, once with \`i = 1\`, and once with \`i = 2\`. Notice it stops *before* reaching 3, not after — that trips a lot of people up at first.\n\nUsing ${voice}, think of it like taking 3 steps and calling out the step number each time: "step 0!", "step 1!", "step 2!" — then you stop, because you were only told to take 3 steps.\n\nIf you want to stop a loop early — before it naturally runs out — you use the **\`break\`** keyword inside it.`],
+    },
+    Functions:{
+      hint:["What do you think happens to a variable created *inside* a function once the function finishes?","Right idea. Now — if a function has no `return`, what value does Python hand back by default?","Try tracing it: what gets passed in first, the parameter or the argument?"],
+      explain:[`A **function** is a named, reusable block of code that you can run whenever you need it, just by calling its name.\n\nYou define one with \`def\`, give it a name, and list any **parameters** (the inputs it expects) in parentheses. When you actually use it later, the real values you hand it are called **arguments**. Inside, it does its work, and it can send a value back to whoever called it using **\`return\`** — if there's no \`return\`, Python quietly hands back \`None\`.\n\nUsing ${voice}, think of a function like a small machine on an assembly line: you feed raw materials in one end (the arguments), the machine does its fixed job, and a finished product comes out the other end (the return value) — and you can run the same machine as many times as you want without rebuilding it.`],
+    },
+  };
+  const set = bank[topic] || bank.Loops;
+  const list = mode==="explain" ? set.explain : set.hint;
+  return list[Math.min(turn, list.length-1)];
+}
+
+/* ---------------- confetti (small, self-contained, respects reduced motion) ---------------- */
+const REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function confettiBurst(){
+  if(REDUCE_MOTION) return;
+  let layer = document.getElementById('confetti-layer');
+  if(!layer){ layer = document.createElement('canvas'); layer.id='confetti-layer'; document.body.appendChild(layer); }
+  layer.width = innerWidth; layer.height = innerHeight;
+  const ctx = layer.getContext('2d');
+  const colors = ['#7C3AED','#EF3D6D','#FFC24B','#0E9F6E','#5B8DFF'];
+  const N = 90;
+  const pieces = Array.from({length:N}, () => ({
+    x: innerWidth/2 + (Math.random()-0.5)*160, y: innerHeight*0.28,
+    vx:(Math.random()-0.5)*9, vy:-Math.random()*7-4, g:0.22+Math.random()*0.12,
+    size:5+Math.random()*5, rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*0.3,
+    color: colors[Math.floor(Math.random()*colors.length)],
+  }));
+  const start = performance.now();
+  function frame(now){
+    const t = now-start;
+    ctx.clearRect(0,0,layer.width,layer.height);
+    let alive = false;
+    pieces.forEach(p=>{
+      p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      if(p.y < layer.height+20) alive = true;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.6);
+      ctx.restore();
+    });
+    if(alive && t < 2600) requestAnimationFrame(frame);
+    else ctx.clearRect(0,0,layer.width,layer.height);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- gamification: XP, levels, streaks, badges ---------------- */
+const BADGES = {
+  first_quiz:{icon:'🎯', label:'First quiz done'},
+  perfect_score:{icon:'💯', label:'Perfect score'},
+  streak_3:{icon:'🔥', label:'3-day streak'},
+  streak_7:{icon:'🚀', label:'7-day streak'},
+  streak_14:{icon:'🌟', label:'14-day streak'},
+  flashcard_10:{icon:'🧠', label:'10 flashcards reviewed'},
+  level_5:{icon:'🏆', label:'Reached level 5'},
+};
+function levelFor(xp){ return 1 + Math.floor(xp/120); }
+function gamifyKey(id){ return 'sp_gamify_'+id; }
+function initGamify(id, s){
+  s.xp=0; s.streak=0; s.lastActive=null; s.badges=[]; s.flashReviews=0;
+  try{
+    const saved = JSON.parse(localStorage.getItem(gamifyKey(id))||'null');
+    if(saved) Object.assign(s, saved);
+  }catch(e){}
+}
+function saveGamify(id, s){
+  try{ localStorage.setItem(gamifyKey(id), JSON.stringify({xp:s.xp,streak:s.streak,lastActive:s.lastActive,badges:s.badges,flashReviews:s.flashReviews})); }catch(e){}
+}
+let TOAST = null; // {icon, text}
+function showToast(icon, text){ TOAST = {icon, text}; render(); setTimeout(()=>{ TOAST=null; render(); }, 2600); }
+function awardBadge(id, s, badgeId){
+  if(s.badges.includes(badgeId)) return;
+  s.badges.push(badgeId);
+  const b = BADGES[badgeId];
+  confettiBurst();
+  showToast(b.icon, 'Badge earned: '+b.label);
+}
+function bumpStreak(id, s){
+  const today = todayISO(), yest = addDaysISO(-1);
+  if(s.lastActive===today){ /* already counted today */ }
+  else if(s.lastActive===yest){ s.streak += 1; }
+  else { s.streak = 1; }
+  s.lastActive = today;
+  if(s.streak===3) awardBadge(id, s, 'streak_3');
+  if(s.streak===7) awardBadge(id, s, 'streak_7');
+  if(s.streak===14) awardBadge(id, s, 'streak_14');
+}
+function awardXP(id, s, amount){
+  const before = levelFor(s.xp);
+  s.xp += amount;
+  const after = levelFor(s.xp);
+  if(after>before){ confettiBurst(); showToast('⭐','Level up! You reached level '+after); }
+  if(after>=5) awardBadge(id, s, 'level_5');
+  saveGamify(id, s);
+}
+function gamifyOnQuizResult(id, s, score, total){
+  bumpStreak(id, s);
+  awardXP(id, s, 10 + score*8);
+  if(s.xp===10+score*8 || !s.badges.includes('first_quiz')) awardBadge(id, s, 'first_quiz');
+  if(total>0 && score===total) awardBadge(id, s, 'perfect_score');
+  saveGamify(id, s);
+}
+function gamifyOnFlashReview(id, s){
+  s.flashReviews = (s.flashReviews||0)+1;
+  bumpStreak(id, s);
+  awardXP(id, s, 4);
+  if(s.flashReviews>=10) awardBadge(id, s, 'flashcard_10');
+  saveGamify(id, s);
+}
+
+/* ---------------- content generation: topic quizzes/flashcards + notes extraction ----------------
+   Two honest tiers, matching the app's existing demo/live split:
+   - DEMO (offline, no setup): can't verify facts about an arbitrary typed topic without a
+     live AI, so "topic" generation builds active-recall STUDY-SKILL questions instead of
+     invented facts. Notes/PDF extraction is different — the student supplies the source
+     text, so pulling real definitions straight out of it is grounded and safe offline.
+   - LIVE (connected backend): generate-quiz / generate-flashcards / generate-from-notes
+     edge functions call the same LLM provider already wired up for the tutor and agent. */
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+const STUDY_SKILL_STEMS = [
+  ["Before studying {T} in depth, what usually works best first?", "Skim a few worked examples to see the shape of it", "Memorize every definition before seeing an example", "Skip the basics and start with the hardest problem", "Guess without looking anything up"],
+  ["When you get a {T} question wrong, what's the best next move?", "Read the explanation, then try a similar question", "Move on immediately without reviewing it", "Only re-read the question, not your answer", "Guess again on the same question"],
+  ["What's a good sign you actually understand {T}, not just memorized it?", "You can explain it in your own words without notes", "You can recite the definition word-for-word", "You recognize the term but couldn't explain it", "You remember seeing the term before"],
+  ["How should you space out practicing {T} over time?", "A little on several different days", "All in one long session the night before a test", "Once, right after learning it, then never again", "Only right before the exam"],
+  ["If another topic feels related to {T}, what should you do?", "Compare them side by side to see how they differ", "Study them with no comparison at all", "Assume they work identically", "Ignore the connection entirely"],
+  ["What's the most useful thing to write down while learning {T}?", "The exact point where you got confused", "Every single word from the source material", "Nothing — read passively instead", "Only the final answer, not your reasoning"],
+  ["When is it worth asking someone else about {T}?", "After you've been stuck for a few minutes on your own attempt", "Never — always figure it out completely alone", "Only after the test is already over", "Right away, before trying it yourself"],
+  ["What helps most right before testing yourself on {T}?", "Trying a practice question without looking at notes first", "Re-reading your notes one more time instead", "Reviewing a completely different topic", "Skipping practice and re-reading a summary"],
+];
+function offlineTopicQuiz(topic, count){
+  const picked = shuffle(STUDY_SKILL_STEMS.slice()).slice(0, Math.min(count, STUDY_SKILL_STEMS.length));
+  return picked.map(([q,a,...wrong])=>({
+    q: q.replace(/\{T\}/g, topic), opts: shuffle([a, ...wrong]), a, diff:'easy',
+    explain: `Offline mode can't verify facts about "${topic}" without a live AI connection, so this checks study strategy instead of content.`,
+  }));
+}
+const RECALL_PROMPT_STEMS = [
+  "Define {T} in one sentence, in your own words.",
+  "Give one real example of {T} that isn't from your notes.",
+  "What's one thing people often get wrong about {T}?",
+  "How does {T} connect to something you already understand?",
+  "Write one question you'd ask a teacher about {T}.",
+  "Summarize {T} in five words or fewer.",
+  "What's the very first step when working through a {T} problem?",
+  "Teach {T} to someone who's never heard of it, in two sentences.",
+];
+function offlineTopicFlashcards(topic, count){
+  const picked = shuffle(RECALL_PROMPT_STEMS.slice()).slice(0, Math.min(count, RECALL_PROMPT_STEMS.length));
+  return picked.map(s => ({ q: s.replace(/\{T\}/g, topic), a: 'Self-check card: write your own answer, then compare it with your notes or textbook.' }));
+}
+/* Real, grounded extraction from the student's own pasted notes (works fully offline, no AI). */
+function extractDefsFromNotes(text, limit){
+  const sentences = String(text||'').replace(/\s+/g,' ').split(/(?<=[.?!])\s+/).map(s=>s.trim()).filter(s=>s.length>12 && s.length<220);
+  const patterns = [/^(.{2,42}?)\s+(?:is|are|means|refers to|is defined as)\s+(.{5,170})$/i, /^(.{2,42}?)\s*[:\u2013]\s*(.{5,170})$/];
+  const defs = [];
+  sentences.forEach(s=>{
+    for(const p of patterns){
+      const m = s.match(p);
+      if(m){ defs.push({term:m[1].trim().replace(/^(the|a|an)\s+/i,''), def:m[2].trim().replace(/\.$/,'')}); break; }
+    }
+  });
+  const seen = new Set();
+  return defs.filter(d=>{ const k=d.term.toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; }).slice(0, limit);
+}
+function quizFromNotes(text, count){
+  const defs = extractDefsFromNotes(text, Math.max(count,4));
+  if(defs.length<2) return null;
+  return defs.slice(0,count).map((d,i)=>{
+    const wrong = shuffle(defs.filter((_,j)=>j!==i).map(x=>x.def)).slice(0,3);
+    return { q:`Based on your notes, what is ${d.term}?`, opts: shuffle([d.def, ...wrong]), a: d.def, diff:'easy',
+      explain:`From your notes: "${d.term} — ${d.def}."` };
+  });
+}
+function flashcardsFromNotes(text, count){
+  return extractDefsFromNotes(text, count).map(d=>({ q:`What is ${d.term}?`, a:d.def }));
+}
+function ingestGeneratedQuiz(topic, questions){
+  QUIZ_BANK[topic] = questions;
+  const s = STUDENTS[currentId];
+  if(!s.topics[topic]) s.topics[topic] = {correct:0,total:0,trend:'insufficient_data',mistakes:[]};
+}
+function ingestGeneratedFlashcards(topic, cards, source){
+  const s = STUDENTS[currentId];
+  cards.forEach(c => s.flashcards.unshift(newCard(topic, c.q, c.a, source||'ai_generated')));
+}
+async function extractPdfText(file){
+  if(!window.pdfjsLib) throw new Error('PDF support needs internet access to load the PDF reader — paste the text instead.');
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({data:buf}).promise;
+  let text = '';
+  for(let i=1;i<=doc.numPages;i++){
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+  return text.trim();
+}
+async function extractDocxText(file){
+  if(!window.mammoth) throw new Error('Word document support needs internet access to load the reader — paste the text instead, or upload a PDF/.txt file.');
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({arrayBuffer: buf});
+  return (result.value||'').trim();
+}
+async function extractAnyDocument(file){
+  const name = (file.name||'').toLowerCase();
+  if(name.endsWith('.pdf') || file.type==='application/pdf') return extractPdfText(file);
+  if(name.endsWith('.docx') || file.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document') return extractDocxText(file);
+  if(name.endsWith('.txt') || file.type==='text/plain') return (await file.text()).trim();
+  throw new Error('Unsupported file type — upload a .pdf, .docx, or .txt file.');
+}
+/* Offline (demo-mode) document grounding: no real AI, so this does a simple keyword
+   match against the uploaded text and quotes the most relevant sentence(s) it finds,
+   rather than inventing an answer. Live mode instead sends the full text to the LLM. */
+const STOPWORDS = new Set(['the','a','an','is','are','was','were','be','been','to','of','in','on','for','and','or','it','this','that','what','how','why','when','where','does','do','did','can','could','would','should','with','about','your','you','i','me','my']);
+function demoDocAnswer(question, docText){
+  const qWords = question.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>2 && !STOPWORDS.has(w));
+  if(!qWords.length) return null;
+  const sentences = docText.replace(/\s+/g,' ').split(/(?<=[.?!])\s+/).map(s=>s.trim()).filter(s=>s.length>8);
+  let best=null, bestScore=0;
+  sentences.forEach(s=>{
+    const low = s.toLowerCase();
+    const score = qWords.reduce((n,w)=>n+(low.includes(w)?1:0),0);
+    if(score>bestScore){ bestScore=score; best=s; }
+  });
+  if(!best || bestScore===0) return null;
+  return `From your uploaded document: "${best.length>280?best.slice(0,280)+'…':best}"`;
+}
+
+/* ---------------- Google Classroom: demo-mode simulation ----------------
+   Demo mode has no real backend/OAuth, so this simulates the same shape of
+   feature (connect -> synced materials -> tutor grounds answers in them)
+   using two small original "class notes" documents instead of a real
+   Google account. Live mode uses the real OAuth+Drive+search pipeline in
+   google-oauth-start / classroom-sync / ai-tutor instead. */
+function connectClassroomDemo(){ CLASSROOM_DEMO.connected = true; render(); }
+function demoClassroomAnswer(topic, message){
+  const words = (message||'').toLowerCase().match(/[a-z]{4,}/g) || [];
+  let best = null, bestScore = 0;
+  CLASSROOM_DEMO.materials.forEach(m=>{
+    const lower = m.text.toLowerCase();
+    const wordScore = words.reduce((s,w)=>s+(lower.includes(w)?1:0), 0);
+    if(wordScore===0) return; // no real keyword overlap — topic match alone is never enough
+    const score = wordScore + (m.topic===topic?0.5:0); // topic only breaks ties between real matches
+    if(score>bestScore){ bestScore=score; best=m; }
+  });
+  if(!best) return null;
+  const sentences = best.text.split(/(?<=[.!?])\s+/);
+  const hit = sentences.find(s=>words.some(w=>s.toLowerCase().includes(w))) || sentences[0];
+  return {text: hit, source: best.title};
+}
+
+/* ---------------- agent trust score (outcome tracking) ----------------
+   Demo-mode mirror of the live orchestrator's baseline/outcome feedback loop
+   (see database/07_agent_feedback_loop.sql): every time the agent recommends
+   a topic we snapshot that topic's accuracy; the next time the agent runs we
+   check whether it actually moved, and roll the last 10 outcomes into a
+   single auditable trust percentage instead of a black-box recommendation. */
+const TRUST_IMPROVED_DELTA = 8;
+function closeTrustLoopDemo(s, topics){
+  const byTopic = new Map(topics.map(t=>[t.topic, t.accPct]));
+  (s.recHistory||[]).forEach(r=>{
+    if(r.resolved) return;
+    const now = byTopic.get(r.topic);
+    if(now===undefined) return;
+    r.outcome = now; r.delta = Math.round(now - r.baseline); r.resolved = true;
+  });
+}
+function recordRecommendationDemo(s, action, topics){
+  if(!action) return;
+  s.recHistory = s.recHistory || [];
+  const t = (topics||[]).find(x=>x.topic===action.topic);
+  if(!t) return;
+  s.recHistory.unshift({topic:action.topic, baseline:t.accPct, outcome:null, delta:null, resolved:false, ts:Date.now()});
+  s.recHistory = s.recHistory.slice(0,25);
+}
+function trustScoreFor(s){
+  const resolved = (s.recHistory||[]).filter(r=>r.resolved).slice(0,10);
+  if(!resolved.length) return {pct:null, sample:0, outcomes:[]};
+  const improved = resolved.filter(r=>r.delta>=TRUST_IMPROVED_DELTA).length;
+  return {pct:Math.round(100*improved/resolved.length), sample:resolved.length, outcomes:resolved};
+}
+
+/* ---------------- tiny render helpers ---------------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const bar = (p,c='var(--amber)') => `<div class="bar"><i style="width:${Math.max(0,Math.min(100,p))}%;background:${c}"></i></div>`;
+const tag = (t,c) => `<span class="tag" style="color:${c}">${esc(t)}</span>`;
+const dot = c => `<i class="dot" style="background:${c}"></i>`;
+function panel(title, body, extra=""){ return `<section class="panel"><h3><span>${title}</span>${extra}</h3>${body}</section>`; }
+function fullpanel(title, body, extra=""){ return `<div class="full">${panel(title, body, extra)}</div>`; }
+function flashSourceTag(source){
+  const map = {manual:['Manual','var(--lavender)'], auto_from_mistake:['Auto (2 misses)','var(--coral)'],
+    ai_generated:['AI-generated','var(--amber)'], from_notes:['From your notes','var(--teal)']};
+  const [label,color] = map[source] || ['Auto (2 misses)','var(--coral)'];
+  return tag(label, color);
+}
+
+function barsChart(items, unit='%'){
+  const max = Math.max(1, ...items.map(x=>x[1]));
+  const n = items.length, w = Math.max(320, n*62), c = w/n;
+  return `<div class="scx"><svg viewBox="0 0 ${w} 180" width="100%" style="min-width:${n*50}px">
+    ${[0,.5,1].map(f=>`<line x1="0" x2="${w}" y1="${150-f*120}" y2="${150-f*120}" stroke="var(--line)"/>`).join('')}
+    ${items.map((x,i)=>{const h=Math.max(0,x[1])/max*120, cx=c*i+c/2;
+      return `<rect x="${cx-15}" y="${150-h}" width="30" height="${h}" rx="4" fill="${x[2]||'var(--amber)'}"><title>${esc(x[0])}</title></rect>
+      <text x="${cx}" y="${144-h}" text-anchor="middle" fill="var(--ink)" font-size="11">${x[1]}${unit}</text>
+      <text x="${cx}" y="167" text-anchor="middle" fill="var(--mut)" font-size="10">${esc(x[0].slice(0,11))}</text>`;
+    }).join('')}
+  </svg></div>`;
+}
+function pieChart(data){
+  const total = data.reduce((a,x)=>a+x[1],0) || 1;
+  let a0 = -Math.PI/2, paths='';
+  data.forEach(x=>{ if(!x[1]) return; const a1=a0+2*Math.PI*x[1]/total;
+    paths += x[1]===total ? `<circle cx="60" cy="60" r="50" fill="${x[2]}"/>` :
+      `<path d="M60 60L${60+50*Math.cos(a0)} ${60+50*Math.sin(a0)}A50 50 0 ${a1-a0>Math.PI?1:0} 1 ${60+50*Math.cos(a1)} ${60+50*Math.sin(a1)}Z" fill="${x[2]}"/>`;
+    a0=a1; });
+  return `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <svg viewBox="0 0 120 120" width="118" height="118">${paths}<circle cx="60" cy="60" r="27" fill="var(--panel)"/></svg>
+    <div>${data.map(x=>`<div style="font-size:12.5px;margin:2px 0">${dot(x[2])}${esc(x[0])} <b>${x[1]}</b> <span class="mu">${Math.round(100*x[1]/total)}%</span></div>`).join('')}</div>
+  </div>`;
+}
+const PALETTE = ['var(--amber)','var(--coral)','var(--teal)','var(--lavender)','var(--gold)'];
+
+/* Accuracy-over-time line chart. series: [{name, color, points:[{x,y}]}] */
+function lineChart(series){
+  const pts = series.flatMap(s=>s.points);
+  if(!pts.length) return '<p class="mu">Not enough history yet — take a quiz to start a trend line.</p>';
+  const w=560,h=190,padL=32,padR=10,padT=12,padB=24;
+  const xs = pts.map(p=>p.x), minX=Math.min(...xs), maxX=Math.max(...xs, minX+1);
+  const X = x => padL + (w-padL-padR)*(x-minX)/(maxX-minX||1);
+  const Y = y => (h-padB) - (h-padB-padT)*(Math.max(0,Math.min(100,y))/100);
+  const grid = [0,25,50,75,100].map(v=>`<line x1="${padL}" x2="${w-padR}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${padL-5}" y="${Y(v)+3}" text-anchor="end" font-size="9" fill="var(--faint)">${v}</text>`).join('');
+  const lines = series.filter(s=>s.points.length).map(s=>{
+    const p = [...s.points].sort((a,b)=>a.x-b.x);
+    const d = p.map((pt,i)=>`${i?'L':'M'}${X(pt.x).toFixed(1)} ${Y(pt.y).toFixed(1)}`).join(' ');
+    const dots = p.map(pt=>`<circle cx="${X(pt.x).toFixed(1)}" cy="${Y(pt.y).toFixed(1)}" r="3.2" fill="${s.color}"><title>${esc(s.name)}: ${pt.y}%</title></circle>`).join('');
+    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>${dots}`;
+  }).join('');
+  const legend = series.map(s=>`<span style="font-size:11.5px;margin-right:12px;display:inline-block;margin-top:4px">${dot(s.color)}${esc(s.name)}</span>`).join('');
+  return `<div class="scx"><svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:340px">${grid}${lines}</svg></div><div>${legend}</div>`;
+}
+
+/* Topic-mastery radar chart. items: [{label, value(0-100)}] */
+function radarChart(items){
+  if(items.length<3) return barsChart(items.map(x=>[x.label,x.value]));
+  const n=items.length, size=230, cx=size/2, cy=size/2, R=size/2-34;
+  const angle = i => -Math.PI/2 + i*2*Math.PI/n;
+  const rings = [.25,.5,.75,1].map(f=>`<polygon points="${items.map((_,i)=>{const a=angle(i);return `${(cx+R*f*Math.cos(a)).toFixed(1)},${(cy+R*f*Math.sin(a)).toFixed(1)}`}).join(' ')}" fill="none" stroke="var(--line)"/>`).join('');
+  const axes = items.map((_,i)=>{const a=angle(i); return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(a)).toFixed(1)}" y2="${(cy+R*Math.sin(a)).toFixed(1)}" stroke="var(--line)"/>`}).join('');
+  const poly = items.map((it,i)=>{const a=angle(i), r=R*Math.max(0,Math.min(100,it.value))/100; return `${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`}).join(' ');
+  const labels = items.map((it,i)=>{const a=angle(i), lx=cx+(R+18)*Math.cos(a), ly=cy+(R+18)*Math.sin(a);
+    return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--mut)">${esc(it.label.slice(0,11))}</text>`}).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="100%" style="max-width:260px;display:block;margin:0 auto">${rings}${axes}<polygon points="${poly}" fill="var(--amber-dim)" stroke="var(--amber)" stroke-width="2"/>${labels}</svg>`;
+}
+
+/* GitHub-style activity heatmap from history's daysAgo field. */
+function activityHeatmap(history, days=35){
+  const counts = new Array(days).fill(0);
+  history.forEach(h=>{ if(h.daysAgo<days) counts[h.daysAgo]++; });
+  const max = Math.max(1,...counts), cols = Math.ceil(days/7);
+  let cells='';
+  for(let col=0; col<cols; col++) for(let row=0; row<7; row++){
+    const idx = days-1-(col*7+row);
+    if(idx<0) continue;
+    const c = counts[idx]||0, op = c===0?0.12:Math.min(1,0.25+c/max*0.75);
+    cells += `<rect x="${col*15}" y="${row*15}" width="12" height="12" rx="3" fill="var(--amber)" opacity="${op.toFixed(2)}"><title>${idx===0?'Today':idx+' day'+(idx===1?'':'s')+' ago'}: ${c} attempt${c===1?'':'s'}</title></rect>`;
+  }
+  return `<div class="scx"><svg viewBox="0 0 ${cols*15} 108" width="100%" style="min-width:${cols*15}px;max-width:520px">${cells}</svg></div><p class="faint" style="font-size:11px;margin-top:6px">Each square is one day, oldest → newest. Darker = more quiz attempts that day.</p>`;
+}
+
+/* Confidence (agent's priority score) vs. accuracy scatter. points: [{label,x,y,color}] */
+function scatterChart(points){
+  if(!points.length) return '<p class="mu">No data yet.</p>';
+  const w=280,h=230,pad=32;
+  const X = x => pad + (w-2*pad)*x/100, Y = y => (h-pad) - (h-2*pad)*y/100;
+  const grid = [0,50,100].map(v=>`<line x1="${pad}" x2="${w-pad}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><line x1="${X(v)}" x2="${X(v)}" y1="${pad}" y2="${h-pad}" stroke="var(--line)"/>`).join('');
+  const dots = points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="7" fill="${p.color}" opacity="0.85"><title>${esc(p.label)}: ${p.y}% accuracy, ${p.x}% priority confidence</title></circle><text x="${X(p.x).toFixed(1)}" y="${(Y(p.y)-11).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--mut)">${esc(p.label.slice(0,9))}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:300px;display:block;margin:0 auto">${grid}${dots}
+    <text x="${w/2}" y="${h-8}" text-anchor="middle" font-size="9" fill="var(--faint)">agent priority confidence →</text>
+  </svg>`;
+}
+
+/* ---------------- live backend (optional) ----------------
+   Talks to the real Supabase project + Edge Functions described in the
+   project's /backend and /database folders. Nothing here runs unless the
+   person explicitly connects on the "Connect" page — demo mode never
+   touches the network. */
+let LIVE = {mode:'demo', url:'', anon:'', sb:null, user:null, authMode:'in', busy:false, error:null};
+let LIVE_TRUST = {pct:null, sample:0, outcomes:[]};
+const LS_URL='sp_backend_url', LS_ANON='sp_backend_anon';
+
+async function callFn(name, {method='GET', query='', body}={}) {
+  const {data} = await LIVE.sb.auth.getSession();
+  const token = data && data.session && data.session.access_token;
+  if (!token) throw new Error('Your session has expired. Please sign in again.');
+  let r;
+  try {
+    r = await fetch(`${LIVE.url}/functions/v1/${name}${query}`, {
+      method, headers: {Authorization:'Bearer '+token, apikey:LIVE.anon, ...(body?{'Content-Type':'application/json'}:{})},
+      body: body?JSON.stringify(body):undefined,
+    });
+  } catch(e) { throw new Error(`Could not reach the server (${name}). Check your connection.`); }
+  let j=null; try{ j = await r.json(); } catch(e){}
+  if (!r.ok) throw new Error((j&&j.error) || `Request failed (${r.status}).`);
+  return j;
+}
+
+/* Normalize a live get-assessment-analytics response into the same shape
+   analyze() produces for demo mode, so every page function works unchanged. */
+function normalizeLiveTopics(anData) {
+  const gapByTopic = new Map((anData.knowledgeGaps||[]).map(g=>[g.topic, g.status]));
+  const mistakesByTopic = new Map();
+  (anData.mistakes||[]).forEach(m=>{
+    const cur = mistakesByTopic.get(m.topic) || {count:0, byType:[]};
+    cur.count += m.count||1; cur.byType.push({type:m.type, n:m.count||1});
+    mistakesByTopic.set(m.topic, cur);
+  });
+  return (anData.topicPerformance||[]).map(t=>{
+    const status = gapByTopic.get(t.topic) || (t.accuracy>=75?'strong':t.accuracy>=55?'needs_practice':'knowledge_gap');
+    const mx = mistakesByTopic.get(t.topic) || {count:0, byType:[]};
+    return {topic:t.topic, acc:t.accuracy/100, accPct:t.accuracy, status, trend:t.trend,
+      correct:t.correct, incorrect:t.incorrect, total:t.attempts, mistakeCount:mx.count, mistakes:mx.byType};
+  });
+}
+/* Normalize a live agent-cycle trace into the same shape act()/runAgentCycle() produce.
+   The tailored plan (LLM-written when the orchestrator's DECIDE step used the LLM, or a
+   template fallback otherwise) lives on trace.action.plan, NOT trace.decision — decision only
+   carries the topic/priority/confidence/reason/factors. Take the whole trace so both are visible. */
+function normalizeLiveAction(trace) {
+  const decision = trace && trace.decision;
+  if (!decision) return null;
+  const action = trace.action || {};
+  return {topic:decision.topic, priority:decision.priority, confidence:decision.confidence,
+    reason:decision.reason, factors:decision.factors, source:decision.source, alternates:decision.alternates||[],
+    plan:(action.plan && action.plan.length ? action.plan : ['Short warm-up quiz','Socratic tutor session','Re-check accuracy after the next attempt']),
+    planSource: action.plan_source || 'template'};
+}
+function pushLiveLog(trace) {
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  AGENT_LOG = (trace.log||[]).map(e=>({t:time, step:e.step, text:e.text})).concat(AGENT_LOG).slice(0,60);
+}
+
+async function loadLiveTopicsAndAgent(trigger) {
+  const [anData, trace] = await Promise.all([
+    callFn('get-assessment-analytics'),
+    callFn('agent-cycle', {method:'POST', body:{trigger}}),
+  ]);
+  LAST_TOPICS = normalizeLiveTopics(anData);
+  LAST_ACTION = normalizeLiveAction(trace);
+  LIVE_HISTORY = ((anData.overall&&anData.overall.attemptHistory)||[]).map(h=>({
+    topic:h.topic, score:h.score, total:h.total,
+    daysAgo: Math.max(0, Math.floor((Date.now()-new Date(h.completedAt).getTime())/86400000)),
+  }));
+  pushLiveLog(trace);
+  try {
+    const trust = await callFn('get-agent-trust');
+    LIVE_TRUST = {pct: trust.trust_pct, sample: trust.sample_size, outcomes: (trust.outcomes||[]).map(o=>({
+      topic:o.topic, baseline:o.baseline, outcome:o.outcome, delta:o.delta, improved:o.improved}))};
+  } catch(e) { /* get-agent-trust may not be deployed yet — trust panel just shows "not enough data" */ }
+}
+
+function persistBackendConfig(url, anon) {
+  try { localStorage.setItem(LS_URL, url); localStorage.setItem(LS_ANON, anon); } catch(e) {}
+}
+function clearBackendConfig() {
+  try { localStorage.removeItem(LS_URL); localStorage.removeItem(LS_ANON); } catch(e) {}
+}
+async function connectBackend() {
+  const url = (document.getElementById('be-url')||{}).value?.trim();
+  const anon = (document.getElementById('be-anon')||{}).value?.trim();
+  LIVE.error = null;
+  if (!url || !anon) { LIVE.error = 'Enter both the project URL and the anon (public) key.'; render(); return; }
+  if (!window.supabase || !window.supabase.createClient) { LIVE.error = 'Could not load supabase-js from the CDN. Check your connection.'; render(); return; }
+  LIVE.url = url.replace(/\/$/,''); LIVE.anon = anon;
+  LIVE.sb = window.supabase.createClient(LIVE.url, LIVE.anon);
+  persistBackendConfig(LIVE.url, LIVE.anon);
+  LIVE.sb.auth.onAuthStateChange(ev=>{ if (ev==='SIGNED_OUT') { LIVE.user=null; LIVE.mode='demo'; render(); } });
+  render();
+}
+function disconnectBackend() {
+  if (LIVE.sb) LIVE.sb.auth.signOut().catch(()=>{});
+  clearBackendConfig();
+  LIVE = {mode:'demo', url:'', anon:'', sb:null, user:null, authMode:'in', busy:false, error:null};
+  GC = {connected:false, syncing:false, status:null, error:null, email:null};
+  bootStudent(currentId, false); view='agent'; render();
+}
+async function ensureLiveProfile(name) {
+  const {data} = await LIVE.sb.from('profiles').select('id').eq('id', LIVE.user.id).maybeSingle();
+  if (!data) await LIVE.sb.from('profiles').insert({id:LIVE.user.id, full_name:name||null});
+}
+async function afterLiveLogin(u) {
+  LIVE.user = {id:u.id, email:u.email, name:(u.user_metadata&&u.user_metadata.full_name)||u.email};
+  LIVE.mode = 'live';
+  try { await ensureLiveProfile(LIVE.user.name===LIVE.user.email?null:LIVE.user.name); } catch(e){}
+  AGENT_LOG = []; LAST_TOPICS = []; LAST_ACTION = null; LIVE_HISTORY = [];
+  QUIZ = {phase:'list', topic:null, qs:[], ans:{}, idx:0, result:null};
+  TUTOR = {topic:null, mode:'hint', turn:0, msgs:[]};
+  GC = {connected:false, syncing:false, status:null, error:null, email:null};
+  view = 'agent'; render();
+  try { await loadLiveTopicsAndAgent('init'); } catch(e) { LIVE.error = e.message; }
+  checkClassroomConnection(); // rehydrate GC.connected from google_tokens — a fresh login/reload otherwise always looks disconnected
+  render();
+}
+async function liveAuth() {
+  const email = (document.getElementById('be-em')||{}).value?.trim().toLowerCase();
+  const pass = (document.getElementById('be-pw')||{}).value;
+  if (!email || !pass) { LIVE.error='Enter your email and password.'; render(); return; }
+  LIVE.busy = true; LIVE.error = null; render();
+  try {
+    if (LIVE.authMode==='in') {
+      const {data, error} = await LIVE.sb.auth.signInWithPassword({email, password:pass});
+      if (error) throw error;
+      LIVE.busy=false; await afterLiveLogin(data.user);
+    } else {
+      const {data, error} = await LIVE.sb.auth.signUp({email, password:pass});
+      if (error) throw error;
+      LIVE.busy=false;
+      if (data.session) await afterLiveLogin(data.user);
+      else { LIVE.authMode='in'; LIVE.error='Account created — check your email to confirm, then sign in.'; render(); }
+    }
+  } catch(e) { LIVE.busy=false; LIVE.error = e.message || 'Something went wrong.'; render(); }
+}
+async function tryRestoreLiveSession() {
+  try {
+    const stored_url = localStorage.getItem(LS_URL), stored_anon = localStorage.getItem(LS_ANON);
+    if (!stored_url || !stored_anon || !window.supabase) return;
+    LIVE.url = stored_url; LIVE.anon = stored_anon;
+    LIVE.sb = window.supabase.createClient(LIVE.url, LIVE.anon);
+    LIVE.sb.auth.onAuthStateChange(ev=>{ if (ev==='SIGNED_OUT') { LIVE.user=null; LIVE.mode='demo'; render(); } });
+    const {data} = await LIVE.sb.auth.getSession();
+    if (data && data.session) await afterLiveLogin(data.session.user);
+  } catch(e) { /* silently fall back to demo mode */ }
+}
+
+/* ---------------- app state ---------------- */
+let currentId = 'aarav';
+let view = 'agent';
+let AGENT_LOG = [];
+let LAST_ACTION = null;
+let TUTOR = {topic:null, mode:'hint', turn:0, msgs:[], docText:'', docName:'', docBusy:false, docError:null};
+let QUIZ = {phase:'list', topic:null, qs:[], ans:{}, idx:0, result:null};
+let FLASH = {revealed:false};
+let ADQ = null;
+let GC = {connected:false, syncing:false, status:null, error:null, email:null};
+let CLASSROOM_DEMO = {connected:false, materials:[
+  {title:'Loops — class notes', topic:'Loops', text:"A loop repeats a block of code without you writing it out multiple times. A for loop is best when you know how many times you want to repeat something — for example, range(5) repeats 5 times. A while loop is best when you don't know the count in advance and want to keep going until some condition changes, like 'while the user hasn't typed quit'. Inside a loop, break exits it immediately, and continue skips the rest of the current pass and moves to the next one. A common bug is the infinite loop, which happens when the loop's stopping condition never actually becomes true — always double check that something inside the loop moves you closer to stopping."},
+  {title:'Functions — class notes', topic:'Functions', text:"A function is a named, reusable block of code defined with def in Python. You call it by name with arguments in parentheses, it runs its body, and it can hand a value back to the caller using return. If a function reaches its end without hitting a return statement, Python automatically returns None. Parameters can have default values, so the caller can leave them out; any extra positional arguments beyond the named ones can be collected into a single *args tuple. Functions matter because they let you name a piece of logic once and reuse it everywhere, instead of copy-pasting the same code and having to fix it in five places when something changes."},
+]};
+let CREATE = {tab:'topic-quiz', topicQ:'', topicN:8, cardsTopic:'', cardsN:8, notes:'', notesMake:'both', busy:false, msg:null};
+let LIVE_FLASH = {loading:false, due:[], all:[], error:null};
+
+function bootStudent(id, silent){
+  currentId = id;
+  const s = STUDENTS[id];
+  const {topics, action, entries} = runAgentCycle(s, silent?`switched active student to ${s.name}`:"init");
+  LAST_TOPICS = topics; LAST_ACTION = action;
+  AGENT_LOG = entries.concat(AGENT_LOG).slice(0,60);
+  TUTOR = {topic: action?action.topic:null, mode:'hint', turn:0, msgs:[]};
+  QUIZ = {phase:'list', topic:null, qs:[], ans:{}, idx:0, result:null};
+  FLASH.revealed = false;
+  ADQ = null;
+}
+let LAST_TOPICS = [];
+let LIVE_HISTORY = [];
+bootStudent(currentId, false);
+
+/* effectiveMode is 'live' only once someone is actually signed in to a
+   connected backend; otherwise everything (including the Connect page
+   itself) runs against the demo data so the app is never blank. */
+const effectiveMode = () => (LIVE.mode==='live' && LIVE.user) ? 'live' : 'demo';
+const personName = () => effectiveMode()==='live' ? LIVE.user.name : STUDENTS[currentId].name;
+const personLevel = () => effectiveMode()==='live' ? LIVE.user.email : STUDENTS[currentId].level;
+const currentHistory = () => effectiveMode()==='live' ? LIVE_HISTORY : STUDENTS[currentId].history;
+
+/* ---------------- pages ---------------- */
+const NAV = [
+  ['agent','Agent', 'M4 4h16v6H4zM4 14h10v6H4zM17 14h3v6h-3z'],
+  ['dash','Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
+  ['gaps','Weak spots', 'M12 3l9 16H3z'],
+  ['quiz','Quizzes', 'M9 11l2 2 4-4M4 4h16v16H4z'],
+  ['flash','Flashcards', 'M4 7l8-4 8 4-8 4-8-4zM4 7v10l8 4 8-4V7M12 11v10'],
+  ['create','Create', 'M12 4v16m8-8H4'],
+  ['tutor','AI Tutor', 'M4 4h16v11H8l-4 4z'],
+  ['features','Features', 'M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z'],
+  ['settings','Connect', 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z'],
+];
+const NAV_GROUP_STARTS = {agent:'Learn', quiz:'Practice', tutor:'Chat', features:'More'};
+
+function studentPicker(){
+  if (effectiveMode()==='live') {
+    return `<div class="student-switch"><button class="on" style="cursor:default">Live · ${esc(LIVE.user.email)}</button><button onclick="disconnectBackend()">Log out</button></div>`;
+  }
+  return `<div class="student-switch">${Object.entries(STUDENTS).map(([id,s])=>
+    `<button class="${id===currentId?'on':''}" onclick="switchStudent('${id}')">${esc(s.name.split(' ')[0])}</button>`).join('')}
+    <button onclick="go('settings')" title="Connect to a real backend">⇄</button></div>`;
+}
+
+function trustPanelHtml(){
+  const em = effectiveMode();
+  let pct, sample, outcomes;
+  if(em==='live'){ pct=LIVE_TRUST.pct; sample=LIVE_TRUST.sample; outcomes=LIVE_TRUST.outcomes||[]; }
+  else { const t = trustScoreFor(STUDENTS[currentId]); pct=t.pct; sample=t.sample;
+    outcomes = t.outcomes.map(o=>({topic:o.topic, baseline:o.baseline, outcome:o.outcome, delta:o.delta, improved:o.delta>=TRUST_IMPROVED_DELTA})); }
+  const rows = outcomes.slice(0,10).map(o=>`<div class="row"><span class="lbl">${esc(o.topic)}</span><span class="mu" style="font-size:12px">${o.baseline}% → ${o.outcome}%</span><b style="color:${o.improved?'var(--teal)':'var(--coral)'}">${o.improved?'✓':'✗'}</b></div>`).join('');
+  return panel('Agent trust score', pct==null
+    ? '<p class="mu">Not enough resolved recommendations yet — take a couple more quizzes so the agent can check whether its last suggestion actually helped.</p>'
+    : `<div style="margin-bottom:8px"><span class="conf">${pct}<small>% of the last ${sample} recommendation${sample===1?'':'s'} improved accuracy</small></span></div>${rows}
+       <p class="faint" style="font-size:11px;margin-top:6px">A recommendation counts as "improved" once that topic's accuracy rose by ${TRUST_IMPROVED_DELTA} points or more after being suggested.</p>`);
+}
+
+function agentPage(){
+  const a = LAST_ACTION, topics = LAST_TOPICS.filter(t=>t.total>0);
+  const rows = topics.map(t=>`<div class="factor"><span>${esc(t.topic)}</span>${bar(t.accPct, (STAT_LABEL[t.status]||[0,'var(--faint)'])[1])}<b>${t.accPct}%</b></div>`).join('');
+  return `
+  <div class="console">
+    <div class="console-top">
+      <div class="who"><i></i><div><h2>Study Agent — live</h2><span class="mu" style="font-size:12px">Watching ${esc(personName())}'s quiz evidence and deciding what to do next</span></div></div>
+      <button class="btn p" onclick="reRunAgent()">Re-run cycle</button>
+    </div>
+    <div class="console-body">
+      <div class="decision">
+        ${a ? `
+        <div class="step">SUGGESTED FOCUS</div>
+        <h3>${esc(a.topic)}</h3>
+        <p>${esc(a.reason)}</p>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:6px">
+          ${tag(a.priority+' priority', a.priority==='high'?'var(--coral)':a.priority==='medium'?'var(--gold)':'var(--teal)')}
+          <span class="conf">${a.confidence}<small>% confidence</small></span>
+        </div>
+        <div class="factors">${a.factors.map(f=>`<div class="factor"><span class="mu">${esc(factorLabel(f.factor))}</span>${bar(Math.round(f.weight*100),'var(--amber)')}<b>${Math.round(f.weight*100)}%</b></div>`).join('')}</div>
+        <div style="margin-top:8px">
+          <div class="mu" style="font-size:11.5px;margin-bottom:6px">SUGGESTED PLAN${a.planSource==='llm'?' · tailored by AI':''}</div>
+          <ol style="margin:0;padding-left:18px;font-size:13px">${a.plan.map(p=>`<li style="margin:4px 0">${esc(p)}</li>`).join('')}</ol>
+        </div>
+        ${a.alternates && a.alternates.length ? `<div class="mu" style="font-size:11px;margin-top:8px">Also considered: ${a.alternates.map(esc).join(', ')}</div>` : ''}
+        <div style="margin-top:12px"><button class="btn" onclick="go('tutor')">Open tutor on this topic →</button></div>
+        ` : `<p class="mu">No quiz evidence yet for this student.</p>`}
+      </div>
+    </div>
+  </div>
+  <div class="grid">
+    ${panel('How the agent scores every topic', rows || '<p class="mu">No data.</p>')}
+    ${trustPanelHtml()}
+    ${panel('How this works', `<p class="mu" style="font-size:13px;line-height:1.7">
+      It looks at every quiz you've taken — which topics you got right, which you missed, and whether you're improving.<br><br>
+      It picks the one topic that needs your attention most right now, and shows you how sure it is.<br><br>
+      Then it suggests a short, concrete plan: a quick warm-up quiz, a tutoring session on the tricky part, and a re-check once you've had another go.</p>`)}
+  </div>`;
+}
+
+function dashPage(){
+  const topics = LAST_TOPICS.filter(t=>t.total>0);
+  const totalQ = topics.reduce((s,t)=>s+t.total,0), totalC = topics.reduce((s,t)=>s+t.correct,0);
+  const mix = ['knowledge_gap','needs_practice','strong'].map(s=>[STAT_LABEL[s][0], topics.filter(t=>t.status===s).length, STAT_LABEL[s][1]]);
+  const hist = currentHistory();
+  const lineSeries = topics.map((t,i)=>({name:t.topic, color:PALETTE[i%PALETTE.length],
+    points: hist.filter(h=>h.topic===t.topic).map(h=>({x:-h.daysAgo, y:Math.round(100*h.score/h.total)}))}));
+  const scored = scoreTopics(LAST_TOPICS);
+  const scatterPoints = scored.map(t=>({label:t.topic, x:t.confidence, y:t.accPct, color:(STAT_LABEL[t.status]||[0,'var(--amber)'])[1]}));
+  return `
+  <div class="kpis">
+    ${kpi('Overall accuracy', totalQ?Math.round(100*totalC/totalQ)+'%':'—')}
+    ${kpi('Topics tracked', topics.length)}
+    ${kpi('Questions answered', totalQ)}
+    ${kpi('Open recommendation', LAST_ACTION?LAST_ACTION.topic:'—')}
+  </div>
+  <div class="grid">
+    ${panel('Accuracy by topic', barsChart(topics.map(t=>[t.topic,t.accPct,(STAT_LABEL[t.status]||[0,'var(--amber)'])[1]])))}
+    ${panel('Topic health', pieChart(mix))}
+    ${panel('Correct vs wrong', pieChart([['Correct',totalC,'var(--teal)'],['Wrong',totalQ-totalC,'var(--coral)']]))}
+    ${fullpanel('Accuracy over time', lineChart(lineSeries))}
+    ${panel('Topic mastery (all topics at once)', radarChart(topics.map(t=>({label:t.topic, value:t.accPct}))))}
+    ${panel('Study activity (last 5 weeks)', activityHeatmap(hist))}
+    ${panel('Priority confidence vs. accuracy', scatterChart(scatterPoints))}
+    ${fullpanel('Recent attempts', hist.map(h=>`<div class="row"><span class="lbl">${esc(h.topic)}</span><span class="mu" style="font-size:12px">${h.daysAgo} day${h.daysAgo===1?'':'s'} ago</span><b>${h.score}/${h.total}</b></div>`).join(''))}
+  </div>`;
+}
+function kpi(label,val){ return `<div class="kpi"><small>${label}</small><b>${val}</b></div>`; }
+
+function gapsPage(){
+  const topics = LAST_TOPICS.filter(t=>t.total>0);
+  const groups = ['knowledge_gap','needs_practice','strong'];
+  const withMistakes = topics.filter(t=>t.mistakes.length);
+  const byType = {};
+  withMistakes.forEach(t=>t.mistakes.forEach(m=>byType[m.type]=(byType[m.type]||0)+m.n));
+  return `<div class="grid">
+    ${panel('Where you stand', pieChart(groups.map(s=>[STAT_LABEL[s][0], topics.filter(t=>t.status===s).length, STAT_LABEL[s][1]])))}
+    ${groups.map(s=>panel(dot(STAT_LABEL[s][1])+STAT_LABEL[s][0], topics.filter(t=>t.status===s).map(t=>`<div style="margin:7px 0;font-size:13px"><b>${esc(t.topic)}</b> <span class="mu">${t.accPct}% · ${t.total} questions · ${t.mistakeCount} mistakes</span></div>`).join('') || '<span class="mu">None</span>')).join('')}
+    ${fullpanel('Mistake log', withMistakes.length ? `<div class="scx"><table><tr><th>Topic</th><th>Type</th><th>Count</th></tr>${withMistakes.flatMap(t=>t.mistakes.map(m=>`<tr><td>${esc(t.topic)}</td><td>${tag(mistakeLabel(m.type),MISTAKE_COLOR[m.type])}</td><td>${m.n}</td></tr>`)).join('')}</table></div>` : '<p class="mu">No mistakes recorded yet.</p>')}
+  </div>`;
+}
+
+function quizPage(){
+  if(QUIZ.phase==='loading') return panel('Available quizzes','<p class="mu">Loading quizzes…</p>');
+  if(QUIZ.phase==='list'){
+    if(!QUIZ.list.length) return panel('Available quizzes','<p class="mu">No quizzes available yet.</p>');
+    return panel('Available quizzes', QUIZ.list.map((x,i)=>`<div class="row" style="grid-template-columns:1fr auto auto">
+      <span class="lbl"><b>${esc(x.topic)}</b></span>
+      ${effectiveMode()==='demo' && QUIZ_BANK[x.topic] ? `<button class="btn" onclick="startAdaptive('${x.topic}')" title="One question at a time, difficulty adapts to your running accuracy, timed per question">Adaptive practice</button>` : '<span></span>'}
+      <button class="btn p" onclick="startQuiz(${i})">Start</button></div>`).join(''));
+  }
+  if(QUIZ.phase==='opening') return panel((QUIZ.topic||'')+' quiz', '<p class="mu">Loading questions…</p>');
+  if(QUIZ.phase==='taking' || QUIZ.phase==='submitting'){
+    const qs = QUIZ.qs, done = Object.keys(QUIZ.ans).length, busy = QUIZ.phase==='submitting';
+    return panel(esc(QUIZ.topic)+' quiz', qs.map((q,i)=>`
+      <div style="margin:14px 0">
+        <b>${i+1}.</b> <span style="white-space:pre-wrap">${esc(q.q)}</span>
+        ${q.opts.map((o,oi)=>`<label class="qopt ${QUIZ.ans[i]===o?'sel':''}"><input type="radio" name="q${i}" ${QUIZ.ans[i]===o?'checked':''} ${busy?'disabled':''} onchange="pickAns(${i},${oi})"><span>${esc(o)}</span></label>`).join('')}
+      </div>`).join('') +
+      (QUIZ.error?`<p role="alert" style="color:var(--coral)">${esc(QUIZ.error)}</p>`:'') +
+      `<p class="mu">${done} of ${qs.length} answered</p><button class="btn p" ${busy||done<qs.length?'disabled':''} onclick="submitQuiz()">${busy?'Submitting…':'Submit quiz'}</button> <button class="btn" ${busy?'disabled':''} onclick="go('quiz')">Cancel</button>`);
+  }
+  if(QUIZ.phase==='result'){
+    const r = QUIZ.result;
+    return `<div class="grid">
+      ${fullpanel('Quiz submitted', `<div class="kpis" style="margin-top:0"><div class="kpi"><small>Score</small><b>${r.score}/${r.total}</b></div><div class="kpi"><small>Accuracy</small><b>${r.pct}%</b></div></div>
+      <p class="mu" style="font-size:13px">The agent has re-run its cycle with this new evidence — check the Agent page for the updated decision.</p>
+      <button class="btn p" onclick="go('agent')">See agent's updated decision</button> <button class="btn" onclick="go('quiz')">Take another quiz</button>`)}
+      ${fullpanel('Your answers — review', r.rows.map((x,i)=>`<div style="margin:9px 0;font-size:13px">${dot(x.correct?'var(--teal)':'var(--coral)')}<b>${i+1}.</b> <span style="white-space:pre-wrap">${esc(x.q)}</span><br><span class="mu">Your answer: ${esc(x.given||'—')}</span> ${tag(x.correct?'Correct':'Incorrect', x.correct?'var(--teal)':'var(--coral)')}${!x.correct && x.a?`<div class="mu" style="margin-top:3px">Correct answer: <b>${esc(x.a)}</b>${x.explain?' — '+esc(x.explain):''}</div>`:''}</div>`).join(''))}
+    </div>`;
+  }
+  if(QUIZ.phase==='adaptive'){
+    if(!ADQ) return panel('Adaptive practice','<p class="mu">Starting…</p>');
+    if(ADQ.phase==='result'){
+      const avgMs = ADQ.log.length ? Math.round(ADQ.log.reduce((s,x)=>s+x.ms,0)/ADQ.log.length) : 0;
+      return `<div class="grid">
+        ${fullpanel('Adaptive practice — '+esc(ADQ.topic), `<div class="kpis" style="margin-top:0">
+          ${kpi('Score', ADQ.correct+'/'+ADQ.total)}
+          ${kpi('Accuracy', Math.round(100*ADQ.correct/ADQ.total)+'%')}
+          ${kpi('Avg. time / question', (avgMs/1000).toFixed(1)+'s')}
+          ${kpi('Reached difficulty', ADQ.diff)}
+        </div>
+        <p class="mu" style="font-size:13px">The agent has re-run its cycle with this new evidence, and any question missed twice is now a flashcard.</p>
+        <button class="btn p" onclick="go('agent')">See agent's updated decision</button> <button class="btn" onclick="go('flash')">Review flashcards</button> <button class="btn" onclick="go('quiz')">Back to quizzes</button>`)}
+        ${fullpanel('Review — every answer explained', ADQ.log.map((x,i)=>`<div style="margin:9px 0;font-size:13px">${dot(x.correct?'var(--teal)':'var(--coral)')}<b>${i+1}.</b> <span style="white-space:pre-wrap">${esc(x.q)}</span> ${tag(x.diff,'var(--mut)')}<br><span class="mu">Your answer: ${esc(x.given)} · ${(x.ms/1000).toFixed(1)}s</span> ${tag(x.correct?'Correct':'Incorrect', x.correct?'var(--teal)':'var(--coral)')}${!x.correct?`<div class="mu" style="margin-top:3px">Correct answer: <b>${esc(x.a)}</b>${x.explain?' — '+esc(x.explain):''}</div>`:''}</div>`).join(''))}
+      </div>`;
+    }
+    const q = ADQ.current;
+    if(!q){ finishAdaptive(); return panel('Adaptive practice','<p class="mu">Wrapping up…</p>'); }
+    return panel(`Adaptive practice — ${esc(ADQ.topic)} `+tag(q.diff,'var(--gold)'), `
+      <p class="mu" style="font-size:12px">Question ${ADQ.total+1} of up to 6 · running accuracy ${ADQ.total?Math.round(100*ADQ.correct/ADQ.total):0}% · difficulty adapts as you go</p>
+      <div style="white-space:pre-wrap;margin:10px 0;font-weight:600">${esc(q.q)}</div>
+      ${q.opts.map((o,oi)=>`<label class="qopt ${ADQ.selected===o?'sel':''}"><input type="radio" name="adq" ${ADQ.selected===o?'checked':''} onchange="adaptivePick(${oi})"><span>${esc(o)}</span></label>`).join('')}
+      <div style="margin-top:12px"><button class="btn p" ${ADQ.selected==null?'disabled':''} onclick="adaptiveNext()">Next question →</button> <button class="btn" onclick="go('quiz')">Cancel</button></div>
+    `);
+  }
+}
+function startAdaptive(topic){
+  const pool = QUIZ_BANK[topic].map((q,i)=>({...q, idx:i}));
+  ADQ = {topic, pool, asked:[], diff:'med', correct:0, total:0, current:null, qStart:Date.now(), selected:null, log:[], phase:'q'};
+  nextAdaptiveQuestion();
+  QUIZ.phase = 'adaptive'; render();
+}
+function pickPoolQuestion(pool, diff, askedIdx){
+  const order = diff==='easy' ? ['easy','med','hard'] : diff==='hard' ? ['hard','med','easy'] : ['med','easy','hard'];
+  for(const tier of order){
+    const cand = pool.filter(q=>q.diff===tier && !askedIdx.includes(q.idx));
+    if(cand.length) return cand[Math.floor(Math.random()*cand.length)];
+  }
+  return null;
+}
+function nextAdaptiveQuestion(){ ADQ.current = pickPoolQuestion(ADQ.pool, ADQ.diff, ADQ.asked); ADQ.qStart = Date.now(); ADQ.selected = null; }
+// Takes the option's index, not its raw text. Option text can contain
+// quotes or HTML (e.g. an AI-generated HTML quiz whose valid answer is
+// literally `<script src="...">`), which must never be interpolated
+// into an inline event-handler attribute — that's what broke the render.
+function adaptivePick(optIdx){ ADQ.selected = ADQ.current.opts[optIdx]; render(); }
+function adaptiveNext(){
+  const q = ADQ.current; if(!q || ADQ.selected==null) return;
+  const ms = Date.now() - ADQ.qStart, correct = ADQ.selected===q.a;
+  ADQ.total++; if(correct) ADQ.correct++;
+  ADQ.asked.push(q.idx);
+  ADQ.log.push({q:q.q, diff:q.diff, given:ADQ.selected, correct, ms, a:q.a, explain:q.explain});
+  if(!correct) registerWrongAnswer(STUDENTS[currentId], ADQ.topic, q.q, q.a);
+  const runningAcc = ADQ.correct/ADQ.total;
+  ADQ.diff = runningAcc>=0.7 ? 'hard' : runningAcc<0.4 ? 'easy' : 'med';
+  if(ADQ.total>=6 || ADQ.asked.length>=ADQ.pool.length){ finishAdaptive(); return; }
+  nextAdaptiveQuestion(); render();
+}
+function finishAdaptive(){
+  ADQ.phase = 'result';
+  const s = STUDENTS[currentId], t = s.topics[ADQ.topic];
+  if(t){ t.correct += ADQ.correct; t.total += ADQ.total;
+    t.trend = ADQ.correct/ADQ.total>=0.7 ? 'improving' : ADQ.correct/ADQ.total<0.5 ? 'declining' : 'stable';
+    if(ADQ.total-ADQ.correct>0) t.mistakes = t.mistakes.concat([{type:'CONCEPTUAL', n: ADQ.total-ADQ.correct}]);
+  }
+  s.history.unshift({topic:ADQ.topic, score:ADQ.correct, total:ADQ.total, daysAgo:0});
+  const {topics, action, entries} = runAgentCycle(s, `adaptive practice ingested: ${ADQ.topic} ${ADQ.correct}/${ADQ.total}`);
+  LAST_TOPICS = topics; LAST_ACTION = action;
+  AGENT_LOG = entries.concat(AGENT_LOG).slice(0,60);
+  gamifyOnQuizResult(currentId, s, ADQ.correct, ADQ.total);
+  render();
+}
+
+/* ---------------- flashcards page ---------------- */
+function dueCards(s){ const t = todayISO(); return s.flashcards.filter(c=>c.due<=t); }
+async function loadLiveFlashcards(){
+  LIVE_FLASH.loading = true; render();
+  try {
+    const r = await callFn('get-flashcards');
+    LIVE_FLASH.due = r.due||[]; LIVE_FLASH.all = r.all||[]; LIVE_FLASH.error = null;
+  } catch(e) { LIVE_FLASH.error = e.message; }
+  LIVE_FLASH.loading = false; render();
+}
+
+/* ---------------- Google Classroom: live mode (real OAuth) ---------------- */
+// Reads GC.connected straight from the google_tokens table (RLS lets a
+// student see their own row) instead of trusting in-memory state, which
+// resets on every login/reload and would otherwise show "disconnected"
+// even after a successful connect.
+async function checkClassroomConnection(){
+  if (!LIVE.sb || !LIVE.user) return;
+  try {
+    const {data} = await LIVE.sb.from('google_tokens').select('student_id, google_email').maybeSingle();
+    GC.connected = !!data;
+    GC.email = (data && data.google_email) || null; // null for older connections made before this column existed
+  } catch(e) { /* leave GC.connected as-is — worst case the button just re-offers connecting */ }
+  render();
+}
+async function connectGoogleClassroom(){
+  GC.error = null; render();
+  try {
+    const r = await callFn('google-oauth-start');
+    const popup = window.open(r.url, 'gc_oauth', 'width=520,height=680');
+    if(!popup) { GC.error = 'Popup blocked — allow popups for this site, then try again.'; render(); return; }
+    // Fallback for browsers/redirect chains that sever window.opener partway
+    // through Google's consent flow (a known behavior, unrelated to this app) —
+    // if that happens the callback's postMessage below never arrives, so once
+    // the popup closes we double-check the real connection state ourselves.
+    const poll = setInterval(()=>{
+      if (popup.closed) {
+        clearInterval(poll);
+        if (!GC.connected) checkClassroomConnection().then(()=>{ if (GC.connected) syncGoogleClassroom(); });
+      }
+    }, 700);
+  } catch(e) { GC.error = e.message; render(); }
+}
+async function syncGoogleClassroom(){
+  GC.syncing = true; GC.error = null; render();
+  try { GC.status = await callFn('classroom-sync', {method:'POST', body:{}}); GC.connected = true; }
+  catch(e) { GC.error = e.message; }
+  GC.syncing = false; render();
+}
+window.addEventListener('message', (ev)=>{
+  if(!ev.data || typeof ev.data!=='object') return;
+  if(ev.data.type==='studypilot_gc_connected'){ GC.connected=true; GC.error=null; render(); syncGoogleClassroom(); }
+  else if(ev.data.type==='studypilot_gc_error'){ GC.error = ev.data.message||'Connection failed.'; render(); }
+});
+function flashPage(){
+  if (effectiveMode()==='live') {
+    if (LIVE_FLASH.loading && !LIVE_FLASH.all.length) return panel('Flashcards','<p class="mu">Loading…</p>');
+    const due = LIVE_FLASH.due, card = due[0];
+    return `<div class="kpis">
+      ${kpi('Due today', due.length)}
+      ${kpi('Total cards', LIVE_FLASH.all.length)}
+      ${kpi('Auto-generated', LIVE_FLASH.all.filter(c=>c.source==='auto_from_mistake').length)}
+    </div>
+    ${LIVE_FLASH.error?`<p role="alert" style="color:var(--coral)">${esc(LIVE_FLASH.error)}</p>`:''}
+    <div class="grid">
+      ${fullpanel('Review', card ? `
+        <div style="max-width:480px;margin:0 auto">
+          <div class="tag" style="margin-bottom:10px">${esc(card.topic)}</div>
+          <div style="min-height:80px;font-size:16px;font-family:var(--font-head);line-height:1.5">${esc(card.question)}</div>
+          ${FLASH.revealed ? `
+            <div style="margin-top:14px;padding:12px 14px;background:var(--panel2);border-radius:10px;font-size:14px"><b>${esc(card.answer)}</b>${card.explanation?`<div class="mu" style="margin-top:6px;font-size:12.5px">${esc(card.explanation)}</div>`:''}</div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn" style="border-color:var(--coral)" onclick="reviewFlashcard('${card.id}',0)">Again</button>
+              <button class="btn" style="border-color:var(--gold)" onclick="reviewFlashcard('${card.id}',3)">Hard</button>
+              <button class="btn p" onclick="reviewFlashcard('${card.id}',4)">Good</button>
+              <button class="btn" style="border-color:var(--teal)" onclick="reviewFlashcard('${card.id}',5)">Easy</button>
+            </div>` : `<button class="btn p" style="margin-top:16px" onclick="FLASH.revealed=true;render()">Show answer</button>`}
+        </div>
+      ` : `<p class="mu">Nothing due right now. New cards appear automatically when you miss the same question twice.</p>`)}
+      ${fullpanel('All cards', LIVE_FLASH.all.length ? `<div class="scx"><table><tr><th>Topic</th><th>Question</th><th>Next review</th><th>Source</th></tr>${LIVE_FLASH.all.map(c=>`<tr><td>${esc(c.topic)}</td><td>${esc(c.question.length>60?c.question.slice(0,60)+'…':c.question)}</td><td>${c.next_review_date<=todayISO()?'Due now':c.next_review_date}</td><td>${flashSourceTag(c.source)}</td></tr>`).join('')}</table></div>` : '<p class="mu">No flashcards yet.</p>')}
+    </div>`;
+  }
+  const s = STUDENTS[currentId];
+  const due = dueCards(s), card = due[0];
+  return `<div class="kpis">
+    ${kpi('Due today', due.length)}
+    ${kpi('Total cards', s.flashcards.length)}
+    ${kpi('Auto-generated', s.flashcards.filter(c=>c.source==='auto_from_mistake').length)}
+  </div>
+  <div class="grid">
+    ${fullpanel('Review', card ? `
+      <div style="max-width:480px;margin:0 auto">
+        <div class="tag" style="margin-bottom:10px">${esc(card.topic)}</div>
+        <div style="min-height:80px;font-size:16px;font-family:var(--font-head);line-height:1.5">${esc(card.q)}</div>
+        ${FLASH.revealed ? `
+          <div style="margin-top:14px;padding:12px 14px;background:var(--panel2);border-radius:10px;font-size:14px"><b>${esc(card.a)}</b></div>
+          <p class="mu" style="font-size:11.5px;margin-top:8px">How well did you know it?</p>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn" style="border-color:var(--coral)" onclick="reviewFlashcard('${card.id}',0)">Again</button>
+            <button class="btn" style="border-color:var(--gold)" onclick="reviewFlashcard('${card.id}',3)">Hard</button>
+            <button class="btn p" onclick="reviewFlashcard('${card.id}',4)">Good</button>
+            <button class="btn" style="border-color:var(--teal)" onclick="reviewFlashcard('${card.id}',5)">Easy</button>
+          </div>` : `<button class="btn p" style="margin-top:16px" onclick="FLASH.revealed=true;render()">Show answer</button>`}
+      </div>
+    ` : `<p class="mu">Nothing due right now — nice work. New cards appear automatically when you miss the same question twice in a quiz, and reviewed cards come back on their own schedule.</p>`)}
+    ${fullpanel('All cards', s.flashcards.length ? `<div class="scx"><table><tr><th>Topic</th><th>Question</th><th>Next review</th><th>Source</th></tr>${s.flashcards.map(c=>`<tr><td>${esc(c.topic)}</td><td>${esc(c.q.length>60?c.q.slice(0,60)+'…':c.q)}</td><td>${c.due<=todayISO()?'Due now':c.due}</td><td>${flashSourceTag(c.source)}</td></tr>`).join('')}</table></div>` : '<p class="mu">No flashcards yet.</p>')}
+  </div>`;
+}
+function reviewFlashcard(id, quality){
+  if (effectiveMode()==='live') {
+    FLASH.revealed = false; render();
+    (async ()=>{ try { await callFn('review-flashcard', {method:'POST', body:{action:'review', card_id:id, quality}}); } catch(e){ LIVE_FLASH.error = e.message; } await loadLiveFlashcards(); })();
+    return;
+  }
+  const s = STUDENTS[currentId], card = s.flashcards.find(c=>c.id===id); if(!card) return;
+  sm2Review(card, quality);
+  gamifyOnFlashReview(currentId, s);
+  FLASH.revealed = false; render();
+}
+async function loadLiveQuizList(){
+  QUIZ = {phase:'loading', topic:null, qs:[], ans:{}, list:[], error:null, result:null};
+  render();
+  try {
+    const {data, error} = await LIVE.sb.from('quizzes').select('id, topic, difficulty').order('topic');
+    if (error) throw error;
+    QUIZ.list = (data||[]).map(q=>({topic:q.topic, id:q.id, difficulty:q.difficulty}));
+    QUIZ.phase = 'list';
+  } catch(e) { QUIZ.phase='list'; QUIZ.error = e.message; }
+  render();
+}
+function startQuiz(i){
+  const item = QUIZ.list[i]; if(!item) return;
+  if (effectiveMode()==='demo') {
+    QUIZ = {phase:'taking', topic:item.topic, list:QUIZ.list,
+      qs: QUIZ_BANK[item.topic].map((q,idx)=>({id:'q'+idx, q:q.q, opts:q.opts, a:q.a})),
+      ans:{}, error:null, result:null};
+    render(); return;
+  }
+  QUIZ = {phase:'opening', topic:item.topic, list:QUIZ.list, id:item.id, qs:[], ans:{}, error:null, result:null};
+  render();
+  (async ()=>{
+    try {
+      const r = await callFn('get-quiz', {query:'?quiz_id='+encodeURIComponent(item.id)});
+      const norm = o => { if(typeof o==='string'){ try{o=JSON.parse(o)}catch(e){o=[]} } return Array.isArray(o)?o.map(String):[]; };
+      QUIZ.qs = (r.questions||[]).map(x=>({id:x.id, q:x.question, opts:norm(x.options)}));
+      QUIZ.phase = QUIZ.qs.length ? 'taking' : 'list';
+      if(!QUIZ.qs.length) QUIZ.error = 'This quiz has no questions yet.';
+    } catch(e) { QUIZ.phase='list'; QUIZ.error = e.message; }
+    render();
+  })();
+}
+// Takes the option's index within this question, not its raw text — see
+// the comment on adaptivePick() for why raw option text can't safely go
+// into an inline attribute.
+function pickAns(i,optIdx){ QUIZ.ans[i] = QUIZ.qs[i].opts[optIdx]; render(); }
+function submitQuiz(){
+  if (effectiveMode()==='demo') {
+    const rows = QUIZ.qs.map((q,i)=>({q:q.q, given:QUIZ.ans[i], correct:QUIZ.ans[i]===q.a, a:q.a, explain:q.explain}));
+    const score = rows.filter(r=>r.correct).length, total = rows.length;
+    QUIZ.result = {score, total, pct:Math.round(100*score/total), rows};
+    QUIZ.phase = 'result';
+    const s = STUDENTS[currentId];
+    rows.forEach(rw=>{ if(!rw.correct) registerWrongAnswer(s, QUIZ.topic, rw.q, rw.a); });
+    const t = s.topics[QUIZ.topic];
+    t.correct += score; t.total += total;
+    t.trend = score/total >= 0.7 ? 'improving' : score/total < 0.5 ? 'declining' : 'stable';
+    if(total-score>0) t.mistakes = t.mistakes.concat([{type:'CONCEPTUAL', n: total-score}]);
+    s.history.unshift({topic:QUIZ.topic, score, total, daysAgo:0});
+    const {topics, action, entries} = runAgentCycle(s, `new quiz attempt ingested: ${QUIZ.topic} ${score}/${total}`);
+    LAST_TOPICS = topics; LAST_ACTION = action;
+    AGENT_LOG = entries.concat(AGENT_LOG).slice(0,60);
+    gamifyOnQuizResult(currentId, s, score, total);
+    render();
+    return;
+  }
+  QUIZ.phase = 'submitting'; QUIZ.error = null; render();
+  (async ()=>{
+    try {
+      // pickAns keys answers by question index (not id), so map back to question_id here
+      const body = {quiz_id: QUIZ.id, answers: QUIZ.qs.map((x,i)=>({question_id:x.id, selected_answer:QUIZ.ans[i]}))};
+      const r = await callFn('submit-quiz-attempt', {method:'POST', body});
+      const qText = id => (QUIZ.qs.find(z=>z.id===id)||{}).q || '(question)';
+      QUIZ.result = {score:r.score, total:r.total, pct:r.accuracy_percent,
+        rows:(r.results||[]).map(x=>({q:qText(x.question_id), given:x.selected_answer, correct:x.correct}))};
+      QUIZ.phase = 'result';
+      if (r.agent) { LAST_ACTION = normalizeLiveAction(r.agent); pushLiveLog(r.agent); }
+      render();
+      try { const anData = await callFn('get-assessment-analytics'); LAST_TOPICS = normalizeLiveTopics(anData);
+        LIVE_HISTORY = ((anData.overall&&anData.overall.attemptHistory)||[]).map(h=>({topic:h.topic, score:h.score, total:h.total,
+          daysAgo: Math.max(0, Math.floor((Date.now()-new Date(h.completedAt).getTime())/86400000))})); } catch(e){}
+      render();
+    } catch(e) { QUIZ.phase='taking'; QUIZ.error = e.message; render(); }
+  })();
+}
+
+function tutorPage(){
+  const topics = effectiveMode()==='live' ? LAST_TOPICS.filter(t=>t.total>0) : LAST_TOPICS.filter(t=>t.total>0 && QUIZ_BANK[t.topic]);
+  if(!TUTOR.topic) TUTOR.topic = topics[0]?.topic;
+  const live = effectiveMode()==='live';
+  const classroomReady = live ? GC.connected : CLASSROOM_DEMO.connected;
+  const docChip = TUTOR.docName
+    ? `<span class="badge-chip" style="margin-right:8px"><span class="ic">📎</span>${esc(TUTOR.docName)}<button onclick="clearTutorDoc()" style="border:none;background:none;cursor:pointer;color:var(--faint);font-size:13px;margin-left:2px;padding:0">✕</button></span>`
+    : '';
+  return `
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    ${topics.map(t=>`<button class="btn ${t.topic===TUTOR.topic?'p':''}" onclick="setTutorTopic('${t.topic}')">${esc(t.topic)}</button>`).join('')}
+    <span style="flex:1"></span>
+    <button class="btn ${TUTOR.mode==='hint'?'p':''}" onclick="setTutorMode('hint')">Socratic (hints)</button>
+    <button class="btn ${TUTOR.mode==='explain'?'p':''}" onclick="setTutorMode('explain')">Explain</button>
+  </div>
+  ${classroomReady ? `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:10px;cursor:pointer"><input type="checkbox" ${TUTOR.useClassroom?'checked':''} onchange="TUTOR.useClassroom=this.checked;render()"> Answer using my Google Classroom material${!live?' (simulated demo)':''}</label>` : ''}
+  ${panel('AI Tutor — adapted to ' + esc(personLevel()), `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+      ${docChip}
+      <label class="btn" style="cursor:pointer;font-size:12.5px">${TUTOR.docBusy?'Reading…':(TUTOR.docName?'Replace document':'📎 Upload a document (PDF / Word / .txt)')}<input type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" style="display:none" ${TUTOR.docBusy?'disabled':''} onchange="handleTutorDocUpload(this)"></label>
+    </div>
+    ${TUTOR.docError?`<p style="color:var(--coral);font-size:12.5px;margin:0 0 10px">${esc(TUTOR.docError)}</p>`:''}
+    ${TUTOR.docName?`<p class="faint" style="font-size:11.5px;margin:0 0 10px">Ask about this document any time — the tutor will ground its answer in it when your question relates.</p>`:''}
+    <div>${TUTOR.msgs.length? TUTOR.msgs.map(m=>`<div class="msg ${m.role==='user'?'user':'ai'}">${mdToHtml(m.text)}</div>`).join('') : `<p class="mu">Ask about ${esc(TUTOR.topic||'a topic')}${TUTOR.docName?' or your uploaded document':''}, or just press Send to get the tutor's first hint.</p>`}${TUTOR.busy?'<p class="mu">Tutor is thinking…</p>':''}</div>
+    ${TUTOR.error?`<p role="alert" style="color:var(--coral)">${esc(TUTOR.error)}</p>`:''}
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="tq" placeholder="Ask your tutor…" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px" ${TUTOR.busy?'disabled':''} onkeydown="if(event.key==='Enter')sendTutor()"><button class="btn p" ${TUTOR.busy?'disabled':''} onclick="sendTutor()">Send</button></div>
+    <p class="faint" style="font-size:11.5px;margin-top:10px">${live? "Connected to a real AI tutor — its replies are based on this student's actual quiz results (and your uploaded document, if any), nothing made up." : 'Demo note: replies here follow simple built-in rules, not a live AI — an uploaded document is searched for a matching sentence rather than truly understood. Connect a backend (⇄ above) to use the real AI Tutor.'}</p>
+  `)}`;
+}
+function clearTutorDoc(){ TUTOR.docText=''; TUTOR.docName=''; TUTOR.docError=null; render(); }
+async function handleTutorDocUpload(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  TUTOR.docBusy=true; TUTOR.docError=null; render();
+  try{
+    const text = await extractAnyDocument(file);
+    if(!text || text.length<20) throw new Error("Couldn't find readable text in that file — try a different one, or paste the content into a .txt file.");
+    TUTOR.docText = text.slice(0, 20000);
+    TUTOR.docName = file.name;
+  }catch(e){ TUTOR.docError = String((e&&e.message)||e); }
+  TUTOR.docBusy=false; render();
+}
+function setTutorTopic(t){ TUTOR.topic=t; TUTOR.turn=0; TUTOR.msgs=[]; render(); }
+function setTutorMode(m){ TUTOR.mode=m; TUTOR.turn=0; render(); }
+function sendTutor(){
+  const el = document.getElementById('tq'); const text = el && el.value.trim();
+  if (effectiveMode()==='demo') {
+    if(text) TUTOR.msgs.push({role:'user', text});
+    let reply = null;
+    if(text && TUTOR.docText) reply = demoDocAnswer(text, TUTOR.docText);
+    if(!reply && text && TUTOR.useClassroom && CLASSROOM_DEMO.connected){
+      const grounded = demoClassroomAnswer(TUTOR.topic, text);
+      if(grounded) reply = `From your synced Classroom material (${grounded.source}): ${grounded.text}`;
+    }
+    if(reply){
+      TUTOR.msgs.push({role:'assistant', text:reply});
+    } else {
+      const fallback = tutorReply(STUDENTS[currentId], TUTOR.topic, TUTOR.mode, TUTOR.turn);
+      const sources = [TUTOR.docText?'uploaded document':null, (TUTOR.useClassroom && CLASSROOM_DEMO.connected)?'synced Classroom material':null].filter(Boolean);
+      TUTOR.msgs.push({role:'assistant', text: (text && sources.length) ? `Nothing about that in your ${sources.join(' or ')} — here's a general hint instead: ${fallback}` : fallback});
+    }
+    TUTOR.turn++; render();
+    const b = document.getElementById('tq'); if(b) { b.value=''; b.focus(); }
+    return;
+  }
+  if(!text || TUTOR.busy) return;
+  const history = TUTOR.msgs.map(m=>({role:m.role, content:m.text}));
+  TUTOR.msgs.push({role:'user', text}); TUTOR.busy=true; TUTOR.error=null; render();
+  (async ()=>{
+    try {
+      const body = {message:text, history, mode:TUTOR.mode, use_classroom: !!(TUTOR.useClassroom && GC.connected)};
+      if(TUTOR.docText){ body.document_text = TUTOR.docText.slice(0, 8000); body.document_name = TUTOR.docName; }
+      const r = await callFn('ai-tutor', {method:'POST', body});
+      let replyText = r.reply||'(no reply)';
+      if (r.classroom_grounded && r.classroom_sources && r.classroom_sources.length) {
+        const names = r.classroom_sources.map(s => typeof s === 'string' ? s : s.title);
+        replyText += `\n\n(from your Classroom: ${names.join(', ')})`;
+      }
+      TUTOR.msgs.push({role:'assistant', text:replyText});
+    } catch(e) { TUTOR.error = e.message; }
+    TUTOR.busy = false; render();
+    const b = document.getElementById('tq'); if(b) { b.value=''; b.focus(); }
+  })();
+}
+
+function settingsPage(){
+  if (effectiveMode()==='live') {
+    return `${panel('Connected', `<p>Signed in as <b>${esc(LIVE.user.email)}</b>, backend <span class="mu">${esc(LIVE.url)}</span>.</p>
+      <div style="margin-top:14px"><button class="btn" onclick="disconnectBackend()">Disconnect &amp; return to demo mode</button></div>`)}
+    ${panel('Google Classroom', `
+      <p class="mu" style="font-size:13px;line-height:1.6">Opt-in: nothing is pulled from your Classroom account until you connect it here. Once connected, the AI Tutor can ground answers in your synced course materials instead of general knowledge — only when you turn that on for a specific question.</p>
+      ${GC.error?`<p role="alert" style="color:var(--coral);margin-top:6px">${esc(GC.error)}</p>`:''}
+      ${!GC.connected ? `<button class="btn p" style="margin-top:10px" onclick="connectGoogleClassroom()">Connect Google Classroom</button>` : `
+        <p style="margin-top:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);margin-right:7px"></span>Connected${GC.email?` as <b>${esc(GC.email)}</b>`:' (account email unavailable — reconnect below to capture it)'}.${GC.status?` Last sync: ${GC.status.courses} course${GC.status.courses===1?'':'s'}, ${GC.status.materials_extracted} document${GC.status.materials_extracted===1?'':'s'} indexed (Docs, Slides, PDFs, and linked/video attachments)${GC.status.materials_not_extracted?`, ${GC.status.materials_not_extracted} skipped (no readable text — e.g. an image or a Sheet)`:''}${GC.status.materials_pending?`, ${GC.status.materials_pending} left for the next sync`:''}.`:' Not synced yet.'}</p>
+        <button class="btn" ${GC.syncing?'disabled':''} onclick="syncGoogleClassroom()">${GC.syncing?'Syncing…':'Sync now'}</button>
+        <button class="btn" style="margin-left:8px" onclick="connectGoogleClassroom()">${GC.email?'Reconnect (grant full access)':'Reconnect to capture account email'}</button>
+        <p class="faint" style="font-size:11.5px;margin-top:8px">If you connected before this update, click Reconnect once — Classwork materials (as opposed to graded coursework) needed a permission that wasn't requested yet, so they wouldn't have synced until you do.</p>
+      `}
+    `)}`;
+  }
+  const connected = !!LIVE.sb;
+  return `${panel('Connect to a real backend', `
+    <p class="mu" style="font-size:13px;line-height:1.6">Demo mode (the default) needs nothing and runs entirely in this browser. To run against the real Supabase project and Edge Functions described in the project download's <code>/backend</code> and <code>/database</code> folders, paste its details below.</p>
+    ${!connected ? `
+      <label style="display:block;margin:10px 0 4px" class="mu">Project URL</label>
+      <input id="be-url" placeholder="https://xxxx.supabase.co" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px">
+      <label style="display:block;margin:10px 0 4px" class="mu">Anon (public) key</label>
+      <input id="be-anon" placeholder="eyJ... or sb_publishable_..." style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px">
+      ${LIVE.error?`<p role="alert" style="color:var(--coral);margin-top:8px">${esc(LIVE.error)}</p>`:''}
+      <button class="btn p" style="margin-top:12px" onclick="connectBackend()">Save and continue</button>
+    ` : `
+      <p style="margin-top:10px">Connected to <span class="mu">${esc(LIVE.url)}</span>.</p>
+      <div class="panel" style="background:var(--panel2);margin:12px 0">
+        <h3 style="margin-bottom:8px"><span>⚡ Quick demo login</span></h3>
+        <p class="mu" style="font-size:12px;margin:0 0 10px">Only works if you've run <code>06_demo_students.sql</code>. Credentials: <code>&lt;name&gt;@demo.com</code> / <code>Demo@123</code> for all four.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${[['Aarav','aarav'],['Diya','diya'],['Rohan','rohan'],['Sneha','sneha']].map(([label,slug])=>
+            `<button class="btn" ${LIVE.busy?'disabled':''} onclick="signInAsDemo('${slug}@demo.com')">Sign in as ${label}</button>`).join('')}
+        </div>
+      </div>
+      <p class="faint" style="font-size:11.5px;margin:14px 0 6px">— or use your own account —</p>
+      <label style="display:block;margin:10px 0 4px" class="mu">Email</label>
+      <input id="be-em" type="email" placeholder="you@example.com" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px">
+      <label style="display:block;margin:10px 0 4px" class="mu">Password</label>
+      <input id="be-pw" type="password" placeholder="At least 6 characters" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px" onkeydown="if(event.key==='Enter')liveAuth()">
+      ${LIVE.error?`<p role="alert" style="color:${LIVE.error.startsWith('Account created')?'var(--teal)':'var(--coral)'};margin-top:8px">${esc(LIVE.error)}</p>`:''}
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn p" ${LIVE.busy?'disabled':''} onclick="liveAuth()">${LIVE.busy?(LIVE.authMode==='in'?'Signing in…':'Creating…'):(LIVE.authMode==='in'?'Sign in':'Create account')}</button>
+      <button class="btn" ${LIVE.busy?'disabled':''} onclick="LIVE.authMode=LIVE.authMode==='in'?'up':'in';render()">${LIVE.authMode==='in'?'Create new account instead':'Back to sign in'}</button>
+      <button class="btn" onclick="clearBackendConfig();LIVE.sb=null;LIVE.url='';LIVE.anon='';render()">Change project</button></div>
+    `}
+  `)}
+  ${panel('Google Classroom (simulated in demo mode)', `
+    <p class="mu" style="font-size:13px;line-height:1.6">Real Google Classroom sync needs a live backend (connect above first). This is a quick, no-setup preview of the idea: it "connects" two sample class-notes documents so you can see the AI Tutor answer from synced material, opt-in, per question.</p>
+    ${!CLASSROOM_DEMO.connected ? `<button class="btn p" style="margin-top:8px" onclick="connectClassroomDemo()">Connect Google Classroom (demo)</button>` : `
+      <p style="margin-top:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);margin-right:7px"></span>Connected (simulated) — ${CLASSROOM_DEMO.materials.length} sample documents synced:</p>
+      ${CLASSROOM_DEMO.materials.map(m=>`<div class="row"><span class="lbl">${esc(m.title)}</span><span class="mu" style="font-size:12px">${esc(m.topic)}</span></div>`).join('')}
+      <p class="faint" style="font-size:11.5px;margin-top:8px">Go to the Tutor tab and check "Answer using my Google Classroom material" to try it.</p>
+    `}
+  `)}`;
+}
+async function signInAsDemo(email){
+  LIVE.authMode='in'; LIVE.error=null; render();
+  setTimeout(()=>{
+    const em=document.getElementById('be-em'), pw=document.getElementById('be-pw');
+    if(em) em.value=email; if(pw) pw.value='Demo@123';
+    liveAuth();
+  }, 0);
+}
+
+function createPage(){
+  const em = effectiveMode();
+  const msg = CREATE.msg ? `<div class="panel full" style="border-color:${CREATE.msg.type==='error'?'var(--coral)':'var(--teal)'};background:${CREATE.msg.type==='error'?'var(--coral-dim)':'var(--teal-dim)'};margin-bottom:14px"><span style="font-size:13px">${esc(CREATE.msg.text)}</span></div>` : '';
+  const tabs = [
+    ['topic-quiz','📝','Quiz from a topic'],
+    ['topic-cards','🧠','Flashcards from a topic'],
+    ['notes','📄','From your notes / PDF'],
+  ];
+  const tabNav = `<div class="create-tabs">${tabs.map(([id,icon,label])=>
+    `<button class="create-tab ${CREATE.tab===id?'on':''}" onclick="CREATE.tab='${id}';CREATE.msg=null;render()">${icon} ${label}</button>`).join('')}</div>`;
+
+  let body = '';
+  if(CREATE.tab==='topic-quiz'){
+    body = `<div class="panel full">
+      <p class="mu" style="font-size:12.5px;margin:0 0 10px">${em==='live' ? 'The connected AI writes real questions on any topic you type.' : "Offline mode can't verify facts about a topic it hasn't seen, so this builds a study-skills self-check instead — connect live mode for real AI-generated questions."}</p>
+      <input id="cr-topic-q" type="text" placeholder="e.g. Photosynthesis" value="${esc(CREATE.topicQ)}" oninput="CREATE.topicQ=this.value" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select onchange="CREATE.topicN=Number(this.value)" style="padding:8px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+          ${[4,6,8,10].map(n=>`<option value="${n}" ${CREATE.topicN===n?'selected':''}>${n} questions</option>`).join('')}
+        </select>
+        <button class="btn p" ${CREATE.busy?'disabled':''} onclick="generateTopicQuizUI()">${CREATE.busy?'Generating…':'Generate quiz'}</button>
+      </div>
+    </div>`;
+  } else if(CREATE.tab==='topic-cards'){
+    body = `<div class="panel full">
+      <p class="mu" style="font-size:12.5px;margin:0 0 10px">${em==='live' ? 'The connected AI writes SM-2-ready flashcard pairs on any topic.' : 'Offline mode builds active-recall self-check cards you fill in yourself — connect live mode for real AI-written answers.'}</p>
+      <input id="cr-cards-topic" type="text" placeholder="e.g. The water cycle" value="${esc(CREATE.cardsTopic)}" oninput="CREATE.cardsTopic=this.value" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select onchange="CREATE.cardsN=Number(this.value)" style="padding:8px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+          ${[5,8,10,12].map(n=>`<option value="${n}" ${CREATE.cardsN===n?'selected':''}>${n} cards</option>`).join('')}
+        </select>
+        <button class="btn p" ${CREATE.busy?'disabled':''} onclick="generateTopicFlashcardsUI()">${CREATE.busy?'Generating…':'Generate flashcards'}</button>
+      </div>
+    </div>`;
+  } else {
+    body = `<div class="panel full">
+      <p class="mu" style="font-size:12.5px;margin:0 0 10px">${em==='live' ? 'The AI extracts key concepts from your own material and grounds every question in it — no outside facts added.' : 'Fully offline: pulls definitions straight out of the text you paste (sentences shaped like "X is Y" or "X: Y") — no AI needed, works right now.'}</p>
+      <textarea id="cr-notes" rows="6" placeholder="Paste your notes here, or upload a PDF below…" oninput="CREATE.notes=this.value" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:8px">${esc(CREATE.notes)}</textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label class="btn" style="cursor:pointer">Upload PDF<input type="file" accept="application/pdf" style="display:none" onchange="handlePdfUpload(this)"></label>
+        <select onchange="CREATE.notesMake=this.value" style="padding:8px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+          <option value="both" ${CREATE.notesMake==='both'?'selected':''}>Quiz + flashcards</option>
+          <option value="quiz" ${CREATE.notesMake==='quiz'?'selected':''}>Quiz only</option>
+          <option value="cards" ${CREATE.notesMake==='cards'?'selected':''}>Flashcards only</option>
+        </select>
+        <button class="btn p" ${CREATE.busy?'disabled':''} onclick="generateFromNotesUI()">${CREATE.busy?'Working…':'Generate from notes'}</button>
+      </div>
+      <p class="faint" style="font-size:11px;margin-top:8px">Once this finishes, the notes are cleared and you're taken straight to your new cards or quiz.</p>
+    </div>`;
+  }
+  return `${tabNav}<div class="grid">${msg}${body}</div>`;
+}
+async function generateTopicQuizUI(){
+  const topic = CREATE.topicQ.trim();
+  if(!topic){ CREATE.msg={type:'error',text:'Type a topic first.'}; render(); return; }
+  CREATE.busy=true; CREATE.msg=null; render();
+  try{
+    if(effectiveMode()==='live'){
+      const res = await callFn('generate-quiz', {method:'POST', body:{topic, count:CREATE.topicN}});
+      CREATE.msg = {type:'ok', text:`Generated a ${res.count}-question quiz on "${topic}". Open the Quizzes tab to take it.`};
+    } else {
+      const qs = offlineTopicQuiz(topic, CREATE.topicN);
+      ingestGeneratedQuiz(topic, qs);
+      CREATE.msg = {type:'ok', text:`Built a ${qs.length}-question offline study-skills quiz on "${topic}". Open the Quizzes tab to take it.`};
+    }
+  }catch(e){ CREATE.msg = {type:'error', text:String((e&&e.message)||e)}; }
+  CREATE.busy=false; render();
+}
+async function generateTopicFlashcardsUI(){
+  const topic = CREATE.cardsTopic.trim();
+  if(!topic){ CREATE.msg={type:'error',text:'Type a topic first.'}; render(); return; }
+  CREATE.busy=true; CREATE.msg=null; render();
+  try{
+    if(effectiveMode()==='live'){
+      const res = await callFn('generate-flashcards', {method:'POST', body:{topic, count:CREATE.cardsN}});
+      CREATE.msg = {type:'ok', text:`Created ${res.created} flashcards on "${topic}". Open the Flashcards tab to review them.`};
+    } else {
+      const cards = offlineTopicFlashcards(topic, CREATE.cardsN);
+      ingestGeneratedFlashcards(topic, cards, 'ai_generated');
+      CREATE.msg = {type:'ok', text:`Created ${cards.length} self-check flashcards on "${topic}". Open the Flashcards tab to review them.`};
+    }
+  }catch(e){ CREATE.msg = {type:'error', text:String((e&&e.message)||e)}; }
+  CREATE.busy=false; render();
+}
+async function generateFromNotesUI(){
+  const notes = CREATE.notes.trim();
+  const make = CREATE.notesMake;
+  if(notes.length<40){ CREATE.msg={type:'error',text:'Paste at least a few sentences of notes first.'}; render(); return; }
+  CREATE.busy=true; CREATE.msg=null; render();
+  try{
+    let madeQuiz=false, madeCards=false, quizCount=0, cardCount=0, topicLabel='From your notes';
+    if(effectiveMode()==='live'){
+      const res = await callFn('generate-from-notes', {method:'POST', body:{notes, make}});
+      madeQuiz = !!res.quiz_id; cardCount = res.flashcards_created||0; madeCards = cardCount>0; topicLabel = res.topic_label || topicLabel;
+    } else {
+      if(make!=='cards'){ const qs = quizFromNotes(notes, 8); if(qs){ ingestGeneratedQuiz(topicLabel, qs); madeQuiz=true; quizCount=qs.length; } }
+      if(make!=='quiz'){ const cards = flashcardsFromNotes(notes, 10); if(cards.length){ ingestGeneratedFlashcards(topicLabel, cards, 'from_notes'); madeCards=true; cardCount=cards.length; } }
+    }
+    if(!madeQuiz && !madeCards){
+      CREATE.msg = {type:'error', text:'Couldn\u2019t find usable content in that text (try notes with sentences shaped like "X is Y" or "X: Y", or add more detail).'};
+      CREATE.busy=false; render(); return;
+    }
+    const parts = [];
+    if(madeQuiz) parts.push((quizCount?quizCount+'-question ':'a ')+'quiz');
+    if(madeCards) parts.push(cardCount+' flashcard'+(cardCount===1?'':'s'));
+    CREATE.notes = ''; CREATE.busy = false; CREATE.msg = null;
+    showToast('📄', `Built ${parts.join(' and ')} from "${topicLabel}"`);
+    go(madeCards ? 'flash' : 'quiz');
+    return;
+  }catch(e){ CREATE.msg = {type:'error', text:String((e&&e.message)||e)}; }
+  CREATE.busy=false; render();
+}
+async function handlePdfUpload(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  CREATE.busy=true; CREATE.msg=null; render();
+  try{
+    const text = await extractPdfText(file);
+    CREATE.notes = text.slice(0, 20000);
+    CREATE.msg = {type:'ok', text:`Extracted ${text.length.toLocaleString()} characters from "${file.name}". Review the text below, then generate.`};
+  }catch(e){ CREATE.msg = {type:'error', text:String((e&&e.message)||e)}; }
+  CREATE.busy=false; render();
+}
+
+
+const PAGES = {agent:agentPage, dash:dashPage, gaps:gapsPage, quiz:quizPage, flash:flashPage, tutor:tutorPage, create:createPage, features:featuresPage, settings:settingsPage};
+
+function featureCard(icon, title, points){
+  return `<div class="panel"><h3><span>${icon} ${esc(title)}</span></h3><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.9;color:var(--mut)">${points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>`;
+}
+function featuresPage(){
+  const s = STUDENTS[currentId];
+  return `
+  <div class="grid">
+    ${featureCard('✨','Create (AI content generation)', [
+      'Type any topic and generate a quiz on it — live mode uses a real LLM; offline mode builds a study-skills self-check',
+      'Type any topic and generate SM-2-ready flashcards on it the same way',
+      'Paste your own notes (or upload a PDF) and generate a quiz + flashcards grounded in that exact text',
+      'Notes extraction works fully offline, since the source material comes from you, not an invented fact',
+    ])}
+    ${featureCard('🧭','Agent loop', [
+      'Perceive → analyze → decide → act, re-run on every new quiz or practice attempt',
+      'Scores each topic as a knowledge gap, needs practice, or strong',
+      'Picks one priority topic with a stated confidence score and written reason',
+      'Every decision is logged with a timestamp so it stays auditable, not a black box',
+    ])}
+    ${featureCard('📈','Agent trust score', [
+      'Every recommendation\u2019s baseline accuracy is snapshotted, then checked again next cycle',
+      'Rolls the last 10 checked recommendations into one auditable percentage',
+      'Shown right on the Agent page — no digging through logs to see if it\u2019s actually working',
+    ])}
+    ${featureCard('📝','Quizzes', [
+      'Standard quizzes per topic, with every wrong answer explained',
+      'Adaptive practice: one question at a time, difficulty adjusts to your running accuracy',
+      'Per-question response time is tracked in adaptive mode',
+      'Live mode adapts quiz difficulty server-side from your recent accuracy',
+    ])}
+    ${featureCard('🧠','Flashcards', [
+      'Spaced repetition using the SM-2 algorithm',
+      'Any question missed twice becomes a flashcard automatically',
+      'Review with Again / Hard / Good / Easy — each sets the next review date',
+      'A due-today count keeps you on top of reviews',
+    ])}
+    ${featureCard('💬','AI Tutor', [
+      'Socratic mode gives hints instead of answers, so you reason it out',
+      'Explain mode gives a direct walkthrough when you just need the answer',
+      "Tone adapts to the student's age and grade level",
+      'In live mode, replies are grounded only in your real quiz evidence — nothing invented',
+    ])}
+    ${featureCard('📊','Dashboard & analytics', [
+      'Accuracy-by-topic bars and a topic-health breakdown',
+      'Accuracy-over-time line chart across your quiz history',
+      'Topic-mastery radar chart across every topic at once',
+      'A study-activity heatmap and a confidence-vs-accuracy scatter plot',
+    ])}
+    ${featureCard('🏆','Study streaks & badges', [
+      `Level ${levelFor(s.xp)} · ${s.xp} XP so far — earn XP for every quiz, adaptive session, and flashcard review`,
+      `Current streak: ${s.streak} day${s.streak===1?'':'s'} of study logged`,
+      'Badges for first quiz, perfect scores, streak milestones, and steady flashcard review',
+      'Progress is saved in this browser, so it carries over between visits',
+    ])}
+    ${fullpanel('Badges earned', s.badges.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${s.badges.map(id=>`<span class="badge-chip"><span class="ic">${BADGES[id].icon}</span>${esc(BADGES[id].label)}</span>`).join('')}</div>` : '<p class="mu">None yet — take a quiz or review a flashcard to start earning badges.</p>')}
+    ${fullpanel('Two ways to run it', `<p class="mu" style="font-size:13px;line-height:1.7">
+      <b>Demo mode</b> (what you're using now) runs entirely in this browser against seeded student data — no setup, no account, no network calls.<br><br>
+      <b>Live mode</b> connects the same interface to a real Supabase backend for persistent accounts, real quiz storage, row-level security, and an LLM-powered tutor and agent. Open the Connect page (⇄) to set it up.</p>`)}
+  </div>`;
+}
+
+function switchStudent(id){ if(id===currentId) return; bootStudent(id, true); view='agent'; render(); }
+function reRunAgent(){
+  if (effectiveMode()==='live') {
+    (async ()=>{ try { await loadLiveTopicsAndAgent('manual re-run requested'); } catch(e){ LIVE.error=e.message; } render(); })();
+    return;
+  }
+  const s = STUDENTS[currentId];
+  const {topics, action, entries} = runAgentCycle(s, "manual re-run requested");
+  LAST_TOPICS = topics; LAST_ACTION = action;
+  AGENT_LOG = entries.concat(AGENT_LOG).slice(0,60);
+  render();
+}
+function go(v){
+  view=v;
+  if(v==='quiz'){
+    if (effectiveMode()==='live') loadLiveQuizList();
+    else { QUIZ = {phase:'list', topic:null, qs:[], ans:{}, list:Object.keys(QUIZ_BANK).map(t=>({topic:t,id:t})), error:null, result:null}; render(); }
+    return;
+  }
+  if(v==='flash'){
+    FLASH.revealed = false;
+    if (effectiveMode()==='live') { loadLiveFlashcards(); return; }
+    render(); return;
+  }
+  render();
+}
+
+function render(){
+  const r = document.getElementById('root');
+  const navHtml = NAV.map(([id,label,path],i)=>`
+    ${(i>0 && NAV_GROUP_STARTS[id]) ? '<span class="tab-divider"></span>' : ''}
+    <div class="item ${id===view?'on':''}" tabindex="0" onclick="go('${id}')" onkeydown="if(event.key==='Enter')go('${id}')">
+      <svg viewBox="0 0 24 24"><path d="${path}"/></svg><span>${label}</span>
+    </div>`).join('');
+  const em = effectiveMode();
+  const gs = em==='demo' ? STUDENTS[currentId] : null;
+  const gamifyHtml = gs ? `<div class="gamify-h" title="Level ${levelFor(gs.xp)} · ${gs.xp} XP">
+      <div class="lvl">${levelFor(gs.xp)}</div>
+      <div class="streak">🔥 ${gs.streak}</div>
+    </div>` : '';
+  r.innerHTML = `
+  <div class="shell">
+    <header class="appheader">
+      <div class="brand"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z"/><path d="M6.5 9.7V15c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8V9.7"/><path d="M21 8v5"/>
+      </svg></div><span class="wordmark">StudyPilot</span></div>
+      <div class="headerright">
+        ${gamifyHtml}
+        <div class="pulse-h"><i style="background:${em==='live'?'var(--teal)':'var(--amber)'};box-shadow:0 0 0 3px ${em==='live'?'var(--teal-dim)':'var(--gold-dim)'}"></i><small>${em==='live'?'LIVE':'DEMO'}</small></div>
+      </div>
+    </header>
+    <nav class="tabbar">${navHtml}</nav>
+    <main>
+      <div class="pagehead">
+        <div><h1>${NAV.find(n=>n[0]===view)[1]}</h1><div class="sub">${em==='live'?esc(personName())+' · '+esc(personLevel()):esc(STUDENTS[currentId].name)+' · '+esc(STUDENTS[currentId].level)}</div></div>
+        ${studentPicker()}
+      </div>
+      ${PAGES[view]()}
+    </main>
+    ${TOAST ? `<div style="position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:9998;animation:badgePop .4s ease both">
+      <div class="badge-chip" style="background:var(--ink);color:#fff;border-color:transparent;box-shadow:var(--shadow-glow)"><span class="ic">${TOAST.icon}</span>${esc(TOAST.text)}</div>
+    </div>` : ''}
+  </div>`;
+}
+render();
+tryRestoreLiveSession();
+</script>
+</body>
+</html>
